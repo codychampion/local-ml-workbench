@@ -1,0 +1,49 @@
+# MLOps Workspace Requirements
+# ============================
+# Phase 1: CPU-only, local development environment
+
+# Core ML Framework (CPU-only)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Experiment Tracking
+wandb>=0.16.0
+
+# Data Visualization
+fiftyone>=0.23.0
+
+# Cloud Storage (Phase 1: mocked, Phase 2/3: real integration)
+b2sdk>=1.24.0
+
+# Image Processing
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Configuration & Utilities
+python-dotenv>=1.0.0
+
+# HTTP & Networking (for future integrations)
+requests>=2.31.0
+
+# PHASE 2/3 TODO: Workflow Orchestration
+# prefect>=2.14.0
+# prefect-ray>=0.3.0  # For distributed execution
+
+# PHASE 2/3 TODO: Cloud GPU Provisioning
+# skypilot>=0.4.0
+
+# PHASE 2/3 TODO: Additional ML tools
+# transformers>=4.35.0  # For Flux/diffusion models
+# diffusers>=0.24.0     # Hugging Face diffusion library
+# accelerate>=0.25.0    # Distributed training utilities
+
+# Development & Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+black>=23.0.0
+ruff>=0.1.0
+
+# PHASE 2/3 TODO: Monitoring & Observability
+# prometheus-client>=0.19.0
+# opentelemetry-api>=1.21.0
