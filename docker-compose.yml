@@ -20,6 +20,29 @@ services:
   # SERVICES (long-running)
   # ---------------------------------------------------------------------------
 
+  # MongoDB for FiftyOne
+  mongodb:
+    image: mongo:7.0
+    container_name: mlops-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=fiftyone
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mlops-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
   comfyui:
     build:
       context: .
@@ -59,17 +82,19 @@ services:
     image: mlops-fiftyone:latest
     container_name: mlops-fiftyone
     restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
     ports:
       - "5151:5151"
     volumes:
       - ./services/fiftyone:/workspace/fiftyone/config:ro
       - fiftyone-data:/workspace/fiftyone/datasets
-      - fiftyone-db:/workspace/fiftyone/database
       - ./data:/workspace/data:ro
     environment:
       - FIFTYONE_APP_ADDRESS=0.0.0.0
       - FIFTYONE_APP_PORT=5151
-      - FIFTYONE_DATABASE_DIR=/workspace/fiftyone/database
+      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
       - FIFTYONE_AUTO_LOAD_QUICKSTART=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5151"]
@@ -85,33 +110,58 @@ services:
           cpus: '2'
           memory: 4G
 
-  wandb-local:
-    build:
-      context: .
-      dockerfile: services/wandb-local/Dockerfile
-    image: mlops-wandb-local:latest
-    container_name: mlops-wandb-local
+  # Self-hosted W&B Server
+  wandb-server:
+    image: wandb/local:latest
+    container_name: mlops-wandb-server
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
-      - wandb-runs:/workspace/wandb/runs
-      - wandb-artifacts:/workspace/wandb/artifacts
+      - wandb-data:/vol/wandb
     environment:
-      - WANDB_MODE=offline
-      - WANDB_DIR=/workspace/wandb/runs
+      - LOCAL_RESTORE=true
+      - GORILLA_ALLOW_USER_REGISTRATION=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 120s
     networks:
       - mlops-network
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1G
+          cpus: '2'
+          memory: 4G
+
+  # Label Studio - Data labeling platform
+  label-studio:
+    image: heartexlabs/label-studio:latest
+    container_name: mlops-label-studio
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - label-studio-data:/label-studio/data
+      - ./data:/label-studio/files:ro
+    environment:
+      - LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
+      - LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - mlops-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 
   # ---------------------------------------------------------------------------
   # WORKERS (job executors) - use: docker-compose run --rm <worker>
@@ -122,14 +172,14 @@ services:
       context: .
       dockerfile: projects/flux-comfyui-generation/Dockerfile
     image: mlops-flux-gen:latest
+    depends_on:
+      - wandb-server
     volumes:
       - .:/workspace:cached
-      - wandb-runs:/workspace/outputs/wandb
       - flux-output:/workspace/outputs/flux-generations
     environment:
-      - WANDB_MODE=offline
+      - WANDB_BASE_URL=http://wandb-server:8080
       - WANDB_PROJECT=flux-comfyui-generation
-      - WANDB_DIR=/workspace/outputs/wandb
       - COMPUTE_DEVICE=cpu
       - B2_LOCAL_MANIFEST=/workspace/.b2_local_manifest.json
     networks:
@@ -147,16 +197,17 @@ services:
       context: .
       dockerfile: projects/adversarial-patches/Dockerfile
     image: mlops-adv-patches:latest
+    depends_on:
+      - wandb-server
+      - mongodb
     volumes:
       - .:/workspace:cached
-      - wandb-runs:/workspace/outputs/wandb
       - adv-output:/workspace/outputs/adversarial-patches
       - fiftyone-data:/workspace/data/fiftyone
     environment:
-      - WANDB_MODE=offline
+      - WANDB_BASE_URL=http://wandb-server:8080
       - WANDB_PROJECT=adversarial-patches
-      - WANDB_DIR=/workspace/outputs/wandb
-      - FIFTYONE_DATABASE_DIR=/workspace/data/fiftyone
+      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
       - COMPUTE_DEVICE=cpu
     networks:
       - mlops-network
@@ -173,15 +224,15 @@ services:
       context: .
       dockerfile: projects/lora-trainer/Dockerfile
     image: mlops-lora-trainer:latest
+    depends_on:
+      - wandb-server
     volumes:
       - .:/workspace:cached
-      - wandb-runs:/workspace/outputs/wandb
       - lora-checkpoints:/workspace/outputs/lora-checkpoints
       - lora-data:/workspace/data/lora-training
     environment:
-      - WANDB_MODE=offline
+      - WANDB_BASE_URL=http://wandb-server:8080
       - WANDB_PROJECT=lora-trainer
-      - WANDB_DIR=/workspace/outputs/wandb
       - COMPUTE_DEVICE=cpu
     networks:
       - mlops-network
@@ -199,12 +250,15 @@ services:
       context: .
       dockerfile: projects/data-collector/Dockerfile
     image: mlops-data-collector:latest
+    depends_on:
+      - mongodb
     volumes:
       - .:/workspace:cached
       - ./data/collected:/workspace/data/collected
       - fiftyone-data:/workspace/data/fiftyone
     environment:
       - COMPUTE_DEVICE=cpu
+      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
     networks:
       - mlops-network
     profiles:
@@ -225,14 +279,17 @@ services:
       dockerfile: docker/base/Dockerfile.diffusers
     image: mlops-dev:latest
     container_name: mlops-dev
+    depends_on:
+      - wandb-server
+      - mongodb
     volumes:
       - .:/workspace:cached
-      - wandb-runs:/workspace/outputs/wandb
       - fiftyone-data:/workspace/data/fiftyone
     environment:
       - MLOPS_ENV=development
       - DEBUG=true
-      - WANDB_MODE=offline
+      - WANDB_BASE_URL=http://wandb-server:8080
+      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
       - COMPUTE_DEVICE=cpu
     ports:
       - "8888:8888"
@@ -264,13 +321,13 @@ services:
 # =============================================================================
 
 volumes:
+  mongodb-data:
   comfyui-models:
   comfyui-output:
   comfyui-input:
   fiftyone-data:
-  fiftyone-db:
-  wandb-runs:
-  wandb-artifacts:
+  wandb-data:
+  label-studio-data:
   flux-output:
   adv-output:
   lora-checkpoints:

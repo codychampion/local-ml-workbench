@@ -1,0 +1,83 @@
+# =============================================================================
+# DVC Pipeline Definitions
+# =============================================================================
+# Run pipelines with: dvc repro
+# Track data with: dvc add <file>
+# Push data with: dvc push (after configuring remote)
+# =============================================================================
+
+stages:
+  # ---------------------------------------------------------------------------
+  # Data Collection Stage
+  # ---------------------------------------------------------------------------
+  collect-data:
+    cmd: >
+      python projects/data-collector/collect.py
+      --subreddit ${collect.subreddit}
+      --limit ${collect.limit}
+      --sort ${collect.sort}
+      --output-dir data/collected/${collect.subreddit}
+    params:
+      - collect.subreddit
+      - collect.limit
+      - collect.sort
+    outs:
+      - data/collected/${collect.subreddit}:
+          cache: true
+          persist: true
+
+  # ---------------------------------------------------------------------------
+  # Auto-Captioning Stage
+  # ---------------------------------------------------------------------------
+  caption-data:
+    cmd: >
+      python projects/data-collector/caption.py
+      --input-dir data/collected/${collect.subreddit}
+      --model ${caption.model}
+      --batch-size ${caption.batch_size}
+    deps:
+      - data/collected/${collect.subreddit}
+      - projects/data-collector/caption.py
+    params:
+      - caption.model
+      - caption.batch_size
+    outs:
+      - data/collected/${collect.subreddit}/captions.json:
+          cache: true
+
+  # ---------------------------------------------------------------------------
+  # Dataset Creation Stage
+  # ---------------------------------------------------------------------------
+  create-dataset:
+    cmd: >
+      python projects/data-collector/create_dataset.py
+      --input-dir data/collected/${collect.subreddit}
+      --name ${dataset.name}
+    deps:
+      - data/collected/${collect.subreddit}
+      - data/collected/${collect.subreddit}/captions.json
+      - projects/data-collector/create_dataset.py
+    params:
+      - dataset.name
+
+  # ---------------------------------------------------------------------------
+  # LoRA Training Stage (Phase 2/3)
+  # ---------------------------------------------------------------------------
+  # train-lora:
+  #   cmd: >
+  #     python projects/lora-trainer/train.py
+  #     --dataset-name ${dataset.name}
+  #     --model-name ${lora.base_model}
+  #     --output-dir outputs/lora-checkpoints
+  #   deps:
+  #     - projects/lora-trainer/train.py
+  #   params:
+  #     - lora.base_model
+  #     - lora.learning_rate
+  #     - lora.epochs
+  #   outs:
+  #     - outputs/lora-checkpoints:
+  #         cache: true
+  #   metrics:
+  #     - outputs/lora-checkpoints/metrics.json:
+  #         cache: false

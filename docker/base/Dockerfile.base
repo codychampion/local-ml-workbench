@@ -52,12 +52,13 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
 # Upgrade pip
 RUN pip install --upgrade pip setuptools wheel
 
-# Install common Python utilities
+# Install common Python utilities + DVC
 RUN pip install \
     python-dotenv>=1.0.0 \
     requests>=2.31.0 \
     pyyaml>=6.0.0 \
-    tqdm>=4.66.0
+    tqdm>=4.66.0 \
+    dvc[all]>=3.0.0
 
 # Use tini as init system
 ENTRYPOINT ["/usr/bin/tini", "--"]

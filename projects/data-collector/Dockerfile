@@ -38,6 +38,8 @@ RUN pip install --no-cache-dir \
     accelerate \
     # Dataset management
     fiftyone \
+    # Data versioning
+    "dvc[all]>=3.0.0" \
     # Utilities
     Pillow numpy tqdm requests \
     python-dotenv pyyaml
