@@ -1,0 +1,13 @@
+[core]
+    remote = local
+    autostage = true
+
+[remote "local"]
+    url = /workspace/data/dvc-cache
+
+# Phase 2/3: Remote storage options
+# [remote "b2"]
+#     url = s3://your-bucket/dvc
+#     endpointurl = https://s3.us-west-000.backblazeb2.com
+# [remote "gcs"]
+#     url = gs://your-bucket/dvc

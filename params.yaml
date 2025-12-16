@@ -1,0 +1,32 @@
+# =============================================================================
+# DVC Pipeline Parameters
+# =============================================================================
+# Modify these values to control pipeline behavior
+# Run: dvc repro to execute the pipeline
+# =============================================================================
+
+# Data Collection Parameters
+collect:
+  subreddit: earthporn
+  limit: 100
+  sort: top  # hot, new, top, rising
+  time: week  # hour, day, week, month, year, all
+
+# Auto-Captioning Parameters
+caption:
+  model: blip  # blip, blip-large, blip2, git
+  batch_size: 8
+
+# Dataset Parameters
+dataset:
+  name: training-dataset
+
+# LoRA Training Parameters (Phase 2/3)
+lora:
+  base_model: stabilityai/stable-diffusion-xl-base-1.0
+  learning_rate: 1e-4
+  epochs: 10
+  batch_size: 1
+  gradient_accumulation: 4
+  rank: 16
+  alpha: 32
