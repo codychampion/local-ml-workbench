@@ -244,21 +244,17 @@ services:
           cpus: '4'
           memory: 8G
 
-  # Data Collector - Reddit scraping + auto-captioning
+  # Data Collector - Reddit/gallery-dl scraping (lightweight)
   data-collector:
     build:
       context: .
       dockerfile: projects/data-collector/Dockerfile
     image: mlops-data-collector:latest
-    depends_on:
-      - mongodb
     volumes:
       - .:/workspace:cached
       - ./data/collected:/workspace/data/collected
-      - fiftyone-data:/workspace/data/fiftyone
     environment:
       - COMPUTE_DEVICE=cpu
-      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
     networks:
       - mlops-network
     profiles:
@@ -267,7 +263,36 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          memory: 2G
+
+  # Captioner - Image captioning + fine-tuning (ML-heavy)
+  captioner:
+    build:
+      context: .
+      dockerfile: projects/captioner/Dockerfile
+    image: mlops-captioner:latest
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/workspace:cached
+      - ./data/collected:/workspace/data/collected
+      - ./data/annotated:/workspace/data/annotated
+      - ./models/captioner:/workspace/models/captioner
+      - fiftyone-data:/workspace/data/fiftyone
+      - huggingface-cache:/workspace/.cache/huggingface
+    environment:
+      - COMPUTE_DEVICE=cpu
+      - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
+      - HF_HOME=/workspace/.cache/huggingface
+    networks:
+      - mlops-network
+    profiles:
+      - workers
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
 
   # ---------------------------------------------------------------------------
   # DEV SHELL - use: docker-compose --profile dev up -d dev
@@ -328,6 +353,7 @@ volumes:
   fiftyone-data:
   wandb-data:
   label-studio-data:
+  huggingface-cache:
   flux-output:
   adv-output:
   lora-checkpoints:
