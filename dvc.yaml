@@ -4,11 +4,15 @@
 # Run pipelines with: dvc repro
 # Track data with: dvc add <file>
 # Push data with: dvc push (after configuring remote)
+#
+# Containers:
+#   - data-collector: Lightweight scraping (no ML dependencies)
+#   - captioner: Image captioning + fine-tuning (ML-heavy)
 # =============================================================================
 
 stages:
   # ---------------------------------------------------------------------------
-  # Data Collection Stage
+  # Stage 1: Data Collection (data-collector container)
   # ---------------------------------------------------------------------------
   collect-data:
     cmd: >
@@ -16,68 +20,91 @@ stages:
       --subreddit ${collect.subreddit}
       --limit ${collect.limit}
       --sort ${collect.sort}
+      --time ${collect.time}
       --output-dir data/collected/${collect.subreddit}
     params:
       - collect.subreddit
       - collect.limit
       - collect.sort
+      - collect.time
     outs:
       - data/collected/${collect.subreddit}:
           cache: true
           persist: true
 
   # ---------------------------------------------------------------------------
-  # Auto-Captioning Stage
+  # Stage 2: Auto-Captioning (captioner container)
   # ---------------------------------------------------------------------------
-  caption-data:
+  caption-images:
     cmd: >
-      python projects/data-collector/caption.py
+      python projects/captioner/caption.py
       --input-dir data/collected/${collect.subreddit}
       --model ${caption.model}
-      --batch-size ${caption.batch_size}
+      --output-format ${caption.output_format}
+      --recursive
     deps:
       - data/collected/${collect.subreddit}
-      - projects/data-collector/caption.py
+      - projects/captioner/caption.py
+      - projects/captioner/models.py
     params:
       - caption.model
-      - caption.batch_size
-    outs:
-      - data/collected/${collect.subreddit}/captions.json:
-          cache: true
+      - caption.output_format
 
   # ---------------------------------------------------------------------------
-  # Dataset Creation Stage
+  # Stage 3: Create FiftyOne Dataset (captioner container)
   # ---------------------------------------------------------------------------
   create-dataset:
     cmd: >
-      python projects/data-collector/create_dataset.py
+      python projects/captioner/create_dataset.py
       --input-dir data/collected/${collect.subreddit}
       --name ${dataset.name}
     deps:
       - data/collected/${collect.subreddit}
-      - data/collected/${collect.subreddit}/captions.json
-      - projects/data-collector/create_dataset.py
+      - projects/captioner/create_dataset.py
     params:
       - dataset.name
 
   # ---------------------------------------------------------------------------
-  # LoRA Training Stage (Phase 2/3)
+  # Stage 4: Fine-tune Captioner (captioner container) - Optional
   # ---------------------------------------------------------------------------
-  # train-lora:
-  #   cmd: >
-  #     python projects/lora-trainer/train.py
-  #     --dataset-name ${dataset.name}
-  #     --model-name ${lora.base_model}
-  #     --output-dir outputs/lora-checkpoints
-  #   deps:
-  #     - projects/lora-trainer/train.py
-  #   params:
-  #     - lora.base_model
-  #     - lora.learning_rate
-  #     - lora.epochs
-  #   outs:
-  #     - outputs/lora-checkpoints:
-  #         cache: true
-  #   metrics:
-  #     - outputs/lora-checkpoints/metrics.json:
-  #         cache: false
+  finetune-captioner:
+    cmd: >
+      python projects/captioner/finetune.py
+      --dataset data/annotated
+      --model ${finetune.base_model}
+      --output models/captioner/${finetune.output_name}
+      --epochs ${finetune.epochs}
+      --batch-size ${finetune.batch_size}
+      --learning-rate ${finetune.learning_rate}
+      --lora-rank ${finetune.lora_rank}
+    deps:
+      - data/annotated
+      - projects/captioner/finetune.py
+      - projects/captioner/models.py
+    params:
+      - finetune.base_model
+      - finetune.output_name
+      - finetune.epochs
+      - finetune.batch_size
+      - finetune.learning_rate
+      - finetune.lora_rank
+    outs:
+      - models/captioner/${finetune.output_name}:
+          cache: true
+
+  # ---------------------------------------------------------------------------
+  # Stage 5: Re-caption with Fine-tuned Model (captioner container)
+  # ---------------------------------------------------------------------------
+  recaption-with-finetuned:
+    cmd: >
+      python projects/captioner/caption.py
+      --input-dir data/collected/${collect.subreddit}
+      --model models/captioner/${finetune.output_name}
+      --output-format txt
+      --recursive
+    deps:
+      - data/collected/${collect.subreddit}
+      - models/captioner/${finetune.output_name}
+      - projects/captioner/caption.py
+    params:
+      - finetune.output_name

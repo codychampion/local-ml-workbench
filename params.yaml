@@ -5,23 +5,42 @@
 # Run: dvc repro to execute the pipeline
 # =============================================================================
 
-# Data Collection Parameters
+# ---------------------------------------------------------------------------
+# Data Collection Parameters (data-collector container)
+# ---------------------------------------------------------------------------
 collect:
   subreddit: earthporn
   limit: 100
-  sort: top  # hot, new, top, rising
-  time: week  # hour, day, week, month, year, all
+  sort: top        # hot, new, top, rising
+  time: week       # hour, day, week, month, year, all
 
-# Auto-Captioning Parameters
+# ---------------------------------------------------------------------------
+# Captioning Parameters (captioner container)
+# ---------------------------------------------------------------------------
 caption:
-  model: blip  # blip, blip-large, blip2, git
-  batch_size: 8
+  model: blip-base       # blip-base, blip-large, blip2-opt, git-base, git-large
+  output_format: txt     # txt, json, jsonl
 
+# ---------------------------------------------------------------------------
 # Dataset Parameters
+# ---------------------------------------------------------------------------
 dataset:
   name: training-dataset
 
-# LoRA Training Parameters (Phase 2/3)
+# ---------------------------------------------------------------------------
+# Fine-tuning Parameters (captioner container)
+# ---------------------------------------------------------------------------
+finetune:
+  base_model: blip-base
+  output_name: my-captioner-v1
+  epochs: 3
+  batch_size: 4
+  learning_rate: 1e-4
+  lora_rank: 8
+
+# ---------------------------------------------------------------------------
+# LoRA Training Parameters (lora-trainer container) - Phase 2/3
+# ---------------------------------------------------------------------------
 lora:
   base_model: stabilityai/stable-diffusion-xl-base-1.0
   learning_rate: 1e-4
