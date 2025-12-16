@@ -3,20 +3,19 @@
 Flux ComfyUI Image Generation Pipeline
 ======================================
 Phase 1: CPU-only implementation with symbolic model for testing
-         W&B offline logging and mocked B2 storage integration
+         AIM logging and mocked B2 storage integration
 
 This script demonstrates the complete MLOps pipeline structure:
-1. Initialize experiment tracking (W&B offline)
+1. Initialize experiment tracking (AIM)
 2. Load/prepare data from storage (mocked B2)
 3. Run inference with a minimal model
-4. Log results and artifacts to W&B
+4. Log results and artifacts to AIM
 5. Upload outputs to storage
 
 PHASE 2/3 TODO:
 - Replace symbolic model with real Flux/ComfyUI pipeline
 - Enable GPU acceleration via SkyPilot
 - Integrate Prefect for workflow orchestration
-- Enable W&B online mode for team collaboration
 """
 
 import sys
@@ -28,13 +27,20 @@ from typing import Optional, Dict, Any
 import numpy as np
 from PIL import Image
 import torch
-import wandb
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config import get_config
 from data_transfer import B2Client
+
+# AIM for experiment tracking
+try:
+    from aim import Run, Image as AimImage
+    AIM_AVAILABLE = True
+except ImportError:
+    AIM_AVAILABLE = False
+    print("[Warning] AIM not installed, metrics logging disabled")
 
 
 class SymbolicImageGenerator:
@@ -102,28 +108,34 @@ class SymbolicImageGenerator:
         return image
 
 
-def init_wandb(config: Dict[str, Any], run_name: Optional[str] = None) -> wandb.sdk.wandb_run.Run:
+def init_aim(config: Dict[str, Any], run_name: Optional[str] = None) -> Optional[Run]:
     """
-    Initialize Weights & Biases for experiment tracking.
+    Initialize AIM for experiment tracking.
+    """
+    if not AIM_AVAILABLE:
+        return None
 
-    Phase 1: Always uses offline mode for local development
-    """
     app_config = get_config()
 
-    run = wandb.init(
-        project=app_config.wandb.project,
-        entity=app_config.wandb.entity,
-        mode=app_config.wandb.mode,  # "offline" in Phase 1
-        dir=str(app_config.wandb.dir),
-        name=run_name or f"flux-gen-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-        config=config,
-        tags=["flux-comfyui", "phase1", "cpu"],
-        notes="Phase 1: Symbolic generation for pipeline validation"
+    run = Run(
+        repo=str(app_config.aim.repo),
+        experiment=app_config.aim.experiment,
     )
 
-    print(f"[W&B] Initialized run: {run.name}")
-    print(f"[W&B] Mode: {app_config.wandb.mode}")
-    print(f"[W&B] Local dir: {app_config.wandb.dir}")
+    # Set run name and metadata
+    run_name = run_name or f"flux-gen-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run.name = run_name
+
+    # Log hyperparameters
+    run["hparams"] = config
+
+    # Add tags
+    run.add_tag("flux-comfyui")
+    run.add_tag("phase1")
+    run.add_tag("cpu")
+
+    print(f"[AIM] Initialized run: {run.name}")
+    print(f"[AIM] Repo: {app_config.aim.repo}")
 
     return run
 
@@ -139,10 +151,10 @@ def run_generation_pipeline(
     Run the complete image generation pipeline.
 
     Steps:
-    1. Initialize W&B tracking
+    1. Initialize AIM tracking
     2. Load any required data from B2 (mocked)
     3. Generate images
-    4. Log to W&B and save outputs
+    4. Log to AIM and save outputs
     5. Upload results to B2 (mocked)
     """
     config = get_config()
@@ -160,23 +172,23 @@ def run_generation_pipeline(
         "phase": "1-local-core"
     }
 
-    # Step 1: Initialize W&B
-    run = init_wandb(pipeline_config)
+    # Step 1: Initialize AIM tracking
+    run = init_aim(pipeline_config)
 
     # Step 2: Initialize B2 client (mocked) and check for any input data
     b2_client = B2Client()
     available_files = b2_client.list_files(prefix="datasets/")
     print(f"[Pipeline] Found {len(available_files)} files in storage")
 
-    # Log data inventory to W&B
-    wandb.log({"data/available_files": len(available_files)})
+    # Log data inventory
+    if run:
+        run.track(len(available_files), name="available_files", context={"subset": "data"})
 
     # Step 3: Initialize generator
     generator = SymbolicImageGenerator(device=config.compute.device)
 
     # Step 4: Generate images
     generated_paths = []
-    generation_table = wandb.Table(columns=["index", "prompt", "image", "seed"])
 
     for i, prompt in enumerate(prompts):
         current_seed = seed + i if seed else None
@@ -193,24 +205,19 @@ def run_generation_pipeline(
 
         # Save locally
         image_path = output_dir / f"generated_{i:04d}.png"
-        Image.fromarray(image_array).save(image_path)
+        pil_image = Image.fromarray(image_array)
+        pil_image.save(image_path)
         generated_paths.append(image_path)
 
-        # Log to W&B
-        wandb_image = wandb.Image(image_array, caption=prompt[:100])
-        wandb.log({
-            f"generated/image_{i}": wandb_image,
-            "generation/step": i,
-            "generation/seed": current_seed
-        })
-
-        # Add to table
-        generation_table.add_data(i, prompt[:100], wandb_image, current_seed)
+        # Log to AIM
+        if run:
+            aim_image = AimImage(pil_image, caption=prompt[:100])
+            run.track(aim_image, name="generated_images", step=i, context={"prompt": prompt[:50]})
+            run.track(i, name="generation_step", step=i)
+            if current_seed:
+                run.track(current_seed, name="seed", step=i)
 
         print(f"[Pipeline] Saved: {image_path}")
-
-    # Log summary table
-    wandb.log({"generation/summary": generation_table})
 
     # Step 5: Upload results to B2 (mocked)
     print("\n[Pipeline] Uploading results to storage...")
@@ -220,17 +227,17 @@ def run_generation_pipeline(
             destination_name=f"outputs/flux-comfyui/{path.name}"
         )
 
-    # Log final metrics
-    wandb.log({
-        "generation/total_images": len(generated_paths),
-        "generation/output_dir": str(output_dir)
-    })
-
-    # Finish W&B run
-    wandb.finish()
+    # Log final summary to AIM
+    if run:
+        run["summary"] = {
+            "total_images": len(generated_paths),
+            "output_dir": str(output_dir),
+            "prompts": prompts,
+        }
+        run.close()
 
     print(f"\n[Pipeline] Complete! Generated {len(generated_paths)} images")
-    print(f"[Pipeline] W&B run saved to: {config.wandb.dir}")
+    print(f"[Pipeline] AIM run saved to: {config.aim.repo}")
 
     return generated_paths
 

@@ -8,7 +8,7 @@ Phase 2/3: Full LoRA training with PEFT and GPU acceleration
 This script demonstrates:
 1. Dataset loading from B2 storage (mocked)
 2. Model preparation for LoRA training
-3. Training loop with W&B logging
+3. Training loop with AIM logging
 4. Checkpoint saving and upload
 """
 
@@ -21,13 +21,20 @@ from typing import Optional, Dict, Any
 import numpy as np
 import torch
 import torch.nn as nn
-import wandb
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config import get_config
 from data_transfer import B2Client
+
+# AIM for experiment tracking
+try:
+    from aim import Run
+    AIM_AVAILABLE = True
+except ImportError:
+    AIM_AVAILABLE = False
+    print("[Warning] AIM not installed, metrics logging disabled")
 
 
 class SymbolicLoRAModel(nn.Module):
@@ -110,22 +117,33 @@ class SymbolicDataset(torch.utils.data.Dataset):
         return self.data[idx], self.targets[idx]
 
 
-def init_wandb(config: Dict[str, Any], run_name: Optional[str] = None):
-    """Initialize W&B for experiment tracking."""
+def init_aim(config: Dict[str, Any], run_name: Optional[str] = None) -> Optional[Run]:
+    """Initialize AIM for experiment tracking."""
+    if not AIM_AVAILABLE:
+        return None
+
     app_config = get_config()
 
-    run = wandb.init(
-        project=app_config.wandb.project,
-        entity=app_config.wandb.entity,
-        mode=app_config.wandb.mode,
-        dir=str(app_config.wandb.dir),
-        name=run_name or f"lora-train-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-        config=config,
-        tags=["lora", "training", "phase1", "cpu"],
-        notes="Phase 1: Symbolic LoRA training for pipeline validation"
+    run = Run(
+        repo=str(app_config.aim.repo),
+        experiment=app_config.aim.experiment,
     )
 
-    print(f"[W&B] Initialized run: {run.name}")
+    # Set run name and metadata
+    run_name = run_name or f"lora-train-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run.name = run_name
+
+    # Log hyperparameters
+    run["hparams"] = config
+
+    # Add tags
+    run.add_tag("lora")
+    run.add_tag("training")
+    run.add_tag("phase1")
+    run.add_tag("cpu")
+
+    print(f"[AIM] Initialized run: {run.name}")
+    print(f"[AIM] Repo: {app_config.aim.repo}")
     return run
 
 
@@ -191,8 +209,8 @@ def run_training_pipeline(
         "phase": "1-local-core"
     }
 
-    # Step 1: Initialize W&B
-    run = init_wandb(train_config)
+    # Step 1: Initialize AIM tracking
+    run = init_aim(train_config)
 
     # Step 2: Initialize B2 client for data loading (mocked)
     b2_client = B2Client()
@@ -219,8 +237,14 @@ def run_training_pipeline(
     )
     criterion = nn.MSELoss()
 
-    # Log model architecture
-    wandb.watch(model, log="all", log_freq=10)
+    # Log model info (AIM doesn't have watch, log param counts instead)
+    if run:
+        run["model"] = {
+            "type": "SymbolicLoRAModel",
+            "lora_rank": lora_rank,
+            "total_params": sum(p.numel() for p in model.parameters()),
+            "trainable_params": sum(p.numel() for p in model.parameters() if p.requires_grad),
+        }
 
     # Step 6: Training loop
     print("\n[Pipeline] Starting training...")
@@ -233,12 +257,10 @@ def run_training_pipeline(
 
         train_loss = train_epoch(model, dataloader, optimizer, criterion, device, epoch)
 
-        # Log metrics
-        wandb.log({
-            "epoch": epoch,
-            "train/loss": train_loss,
-            "train/learning_rate": optimizer.param_groups[0]["lr"],
-        })
+        # Log metrics to AIM
+        if run:
+            run.track(train_loss, name="loss", epoch=epoch, context={"subset": "train"})
+            run.track(optimizer.param_groups[0]["lr"], name="learning_rate", epoch=epoch)
 
         print(f"[Epoch {epoch}] Average Loss: {train_loss:.4f}")
 
@@ -269,26 +291,23 @@ def run_training_pipeline(
         "config": train_config,
     }, final_checkpoint_path)
 
-    # Log artifacts
-    artifact = wandb.Artifact("lora-checkpoints", type="model")
-    artifact.add_file(str(final_checkpoint_path))
-    wandb.log_artifact(artifact)
-
-    # Log final summary
-    wandb.log({
-        "training/best_loss": best_loss,
-        "training/final_loss": train_loss,
-        "training/total_epochs": num_epochs,
-    })
-
-    wandb.finish()
+    # Log final summary to AIM
+    if run:
+        run["summary"] = {
+            "best_loss": best_loss,
+            "final_loss": train_loss,
+            "total_epochs": num_epochs,
+            "checkpoint_path": str(final_checkpoint_path),
+        }
+        run.close()
 
     print(f"\n{'='*60}")
     print("Training Complete!")
     print(f"{'='*60}")
     print(f"Best Loss: {best_loss:.4f}")
     print(f"Checkpoints: {output_dir}")
-    print(f"W&B Run: {run.name}")
+    if run:
+        print(f"AIM Run: {run.name}")
 
 
 def main():

@@ -3,14 +3,14 @@
 Adversarial Patch Generation Pipeline
 ======================================
 Phase 1: CPU-only implementation with symbolic attacks for testing
-         W&B offline logging and FiftyOne visualization integration
+         AIM logging and FiftyOne visualization integration
 
 This script demonstrates adversarial attack visualization:
 1. Load sample dataset via FiftyOne
 2. Generate symbolic adversarial patches
 3. Apply patches to images
 4. Visualize results in FiftyOne
-5. Log attack metrics to W&B
+5. Log attack metrics to AIM
 
 Security Note: This is for authorized research and educational purposes only.
 Adversarial ML research helps improve model robustness and security.
@@ -32,7 +32,6 @@ import numpy as np
 from PIL import Image
 import torch
 import torch.nn as nn
-import wandb
 import fiftyone as fo
 import fiftyone.zoo as foz
 
@@ -41,6 +40,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config import get_config
 from data_transfer import B2Client
+
+# AIM for experiment tracking
+try:
+    from aim import Run, Image as AimImage
+    AIM_AVAILABLE = True
+except ImportError:
+    AIM_AVAILABLE = False
+    print("[Warning] AIM not installed, metrics logging disabled")
 
 
 class SymbolicPatchGenerator:
@@ -162,23 +169,33 @@ class SymbolicPatchGenerator:
         return result
 
 
-def init_wandb(config: Dict[str, Any], run_name: Optional[str] = None) -> wandb.sdk.wandb_run.Run:
-    """Initialize W&B for experiment tracking (offline mode in Phase 1)."""
+def init_aim(config: Dict[str, Any], run_name: Optional[str] = None) -> Optional[Run]:
+    """Initialize AIM for experiment tracking."""
+    if not AIM_AVAILABLE:
+        return None
+
     app_config = get_config()
 
-    run = wandb.init(
-        project=app_config.wandb.project,
-        entity=app_config.wandb.entity,
-        mode=app_config.wandb.mode,
-        dir=str(app_config.wandb.dir),
-        name=run_name or f"adv-patch-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-        config=config,
-        tags=["adversarial", "fiftyone", "phase1", "cpu"],
-        notes="Phase 1: Symbolic adversarial patches for pipeline validation"
+    run = Run(
+        repo=str(app_config.aim.repo),
+        experiment=app_config.aim.experiment,
     )
 
-    print(f"[W&B] Initialized run: {run.name}")
-    print(f"[W&B] Mode: {app_config.wandb.mode}")
+    # Set run name and metadata
+    run_name = run_name or f"adv-patch-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run.name = run_name
+
+    # Log hyperparameters
+    run["hparams"] = config
+
+    # Add tags
+    run.add_tag("adversarial")
+    run.add_tag("fiftyone")
+    run.add_tag("phase1")
+    run.add_tag("cpu")
+
+    print(f"[AIM] Initialized run: {run.name}")
+    print(f"[AIM] Repo: {app_config.aim.repo}")
 
     return run
 
@@ -225,12 +242,12 @@ def run_adversarial_pipeline(
     Run the adversarial patch visualization pipeline.
 
     Steps:
-    1. Initialize W&B tracking
+    1. Initialize AIM tracking
     2. Load FiftyOne dataset
     3. Generate adversarial patches
     4. Apply patches to images
     5. Create FiftyOne visualization dataset
-    6. Log results to W&B
+    6. Log results to AIM
     """
     config = get_config()
     output_dir = Path(output_dir)
@@ -249,8 +266,8 @@ def run_adversarial_pipeline(
         "phase": "1-local-core"
     }
 
-    # Step 1: Initialize W&B
-    run = init_wandb(pipeline_config)
+    # Step 1: Initialize AIM tracking
+    run = init_aim(pipeline_config)
 
     # Step 2: Load FiftyOne dataset
     print("\n[Pipeline] Loading FiftyOne dataset...")
@@ -273,11 +290,6 @@ def run_adversarial_pipeline(
     viz_dataset.persistent = True
 
     print(f"\n[Pipeline] Processing {num_samples} samples with {len(pattern_types)} pattern types...")
-
-    # Tables for W&B logging
-    attack_table = wandb.Table(columns=[
-        "sample_id", "pattern_type", "original", "patched", "patch"
-    ])
 
     sample_idx = 0
     for sample in source_dataset.take(num_samples):
@@ -328,14 +340,10 @@ def run_adversarial_pipeline(
 
             viz_dataset.add_sample(fo_sample)
 
-            # Log to W&B
-            attack_table.add_data(
-                f"sample_{sample_idx}",
-                pattern_type,
-                wandb.Image(original_image),
-                wandb.Image(patched_image),
-                wandb.Image(patch)
-            )
+            # Log to AIM
+            if run:
+                aim_patched = AimImage(Image.fromarray(patched_image), caption=f"{pattern_type} patch")
+                run.track(aim_patched, name="patched_images", step=sample_idx, context={"pattern": pattern_type})
 
             # Upload to B2 (mocked)
             b2_client.upload_file(
@@ -345,12 +353,13 @@ def run_adversarial_pipeline(
 
             sample_idx += 1
 
-    # Log summary to W&B
-    wandb.log({
-        "attack/summary_table": attack_table,
-        "attack/total_samples": sample_idx,
-        "attack/pattern_types": len(pattern_types)
-    })
+    # Log summary to AIM
+    if run:
+        run["summary"] = {
+            "total_samples": sample_idx,
+            "pattern_types": pattern_types,
+            "num_pattern_types": len(pattern_types),
+        }
 
     # Save dataset
     viz_dataset.save()
@@ -371,8 +380,9 @@ def run_adversarial_pipeline(
         except KeyboardInterrupt:
             print("\n[FiftyOne] Shutting down...")
 
-    # Finish W&B run
-    wandb.finish()
+    # Finish AIM run
+    if run:
+        run.close()
 
     print(f"\n[Pipeline] Complete!")
     print(f"[Pipeline] Output directory: {output_dir}")
