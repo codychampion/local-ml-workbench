@@ -45,13 +45,16 @@ ml_workbench/
 | Workflow Orchestration | **Prefect** | Self-hosted DAG pipelines with UI |
 | Data Versioning | **DVC** | Git for data, tracks datasets/models |
 | Experiment Tracking | **AIM** | Self-hosted, replaces W&B |
+| Model Registry | **AIM + S3** | Version, store, and promote models |
+| Data Quality | **Great Expectations** | Data validation and quality checks |
 | Object Storage | **MinIO** → B2/S3 | S3-compatible, cloud-portable |
 | Notebooks | **Marimo** | Reactive .py notebooks, NOT Jupyter |
 | Distributed Storage | **JuiceFS** | Redis-backed |
 | Secrets | **HashiCorp Vault** | ALL secrets go here |
 | LLM Gateway | **LiteLLM** | Unified API for multiple LLMs |
-| Annotation | **Label Studio**, **CVAT** | Images/text and video |
-| Dataset Viz | **FiftyOne**, **Spotlight** | |
+| Annotation | **Label Studio**, **CVAT** | Images/text and video, S3-backed |
+| Dataset Viz | **FiftyOne**, **Spotlight** | S3-backed for remote datasets |
+| Image Generation | **ComfyUI** | Full ComfyUI with S3 model sync |
 | Knowledge Base | **SiYuan** | Zettelkasten, papers, experiment notes |
 
 ## Common Patterns
@@ -117,6 +120,55 @@ training_flow({"epochs": 10})
 All pipeline scripts (train_lora.py, run_generation.py, collect.py, etc.) are
 decorated with `@flow` and `@task` for Prefect orchestration.
 
+### Model Registry (AIM + S3)
+```python
+from utils import ModelRegistry, register_model, load_model, list_models
+
+# Register a model after training
+registry = ModelRegistry()
+model_info = registry.register(
+    model_path="./outputs/model.pt",
+    name="blip-captioner-lora",
+    version="1.0.0",
+    metrics={"accuracy": 0.95, "loss": 0.05},
+    aim_run=run,  # Link to AIM experiment
+    stage="development"
+)
+
+# Load a model (auto-downloads from S3)
+model_path = load_model("blip-captioner-lora", version="latest")
+
+# Promote to production
+registry.promote("blip-captioner-lora", "1.0.0", stage="production")
+
+# List all models
+for model in list_models():
+    print(f"{model.name}@{model.latest_version}")
+```
+
+### Data Validation (Great Expectations)
+```python
+# Via REST API (http://localhost:8084)
+import requests
+
+# Validate a dataset
+response = requests.post("http://localhost:8084/api/validate", json={
+    "datasource": "minio_data",
+    "asset": "datasets/train.csv",
+    "suite": "image_dataset"
+})
+print(response.json()["success"])  # True/False
+
+# Create expectation suite
+requests.post("http://localhost:8084/api/expectations", json={
+    "name": "my_dataset",
+    "expectations": [
+        {"type": "expect_column_to_exist", "column": "filepath"},
+        {"type": "expect_column_values_to_not_be_null", "column": "caption"}
+    ]
+})
+```
+
 ### Vault Secrets (ALL credentials go here)
 ```python
 from utils import get_secret, get_api_key, get_s3_credentials, VaultClient
@@ -175,15 +227,16 @@ docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 |---------|-----|-------------|
 | MinIO Console | http://localhost:9001 | mlops-admin / mlops-dev-password |
 | AIM | http://localhost:43800 | - |
-| Label Studio | http://localhost:8081 | - |
-| CVAT | http://localhost:8082 | - |
+| Prefect | http://localhost:4200 | - |
+| Label Studio | http://localhost:8081 | S3-backed |
+| CVAT | http://localhost:8082 | S3-backed |
 | Spotlight | http://localhost:8083 | - |
-| FiftyOne | http://localhost:5151 | - |
+| Great Expectations | http://localhost:8084 | - |
+| FiftyOne | http://localhost:5151 | S3-backed |
 | SiYuan | http://localhost:6806 | Code: mlops-dev |
-| ComfyUI | http://localhost:8188 | - |
+| ComfyUI | http://localhost:8188 | S3 model sync |
 | Vault | http://localhost:8200 | Token: mlops-dev-token |
 | LiteLLM | http://localhost:4000 | - |
-| Prefect | http://localhost:4200 | - |
 
 ## File Naming Conventions
 
@@ -202,6 +255,18 @@ docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 6. **SiYuan for notes** - Use for papers, experiment notes, knowledge base
 7. **DVC for data versioning** - Use `dvc.yaml` and `params.yaml` for data pipelines
 8. **Prefect for orchestration** - All pipelines have `@flow` decorators
+9. **Model Registry** - Register models with `register_model()` after training
+10. **Great Expectations** - Validate datasets before training at http://localhost:8084
+
+## S3 Integration
+
+All annotation and visualization tools connect to MinIO:
+- **Label Studio**: Import/export datasets from `s3://mlops-data/`
+- **CVAT**: Import videos from S3, export annotations to S3
+- **FiftyOne**: Load datasets directly from S3 URLs
+- **ComfyUI**: Auto-syncs models from `s3://mlops-models/comfyui/`
+
+To use S3 storage in annotation tools, configure cloud storage in their respective UIs pointing to `http://minio:9000`.
 
 ## Quick Debugging
 

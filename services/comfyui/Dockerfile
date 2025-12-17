@@ -1,7 +1,8 @@
 # =============================================================================
-# ComfyUI Service Container
+# ComfyUI Service Container - Real Implementation
 # =============================================================================
-FROM python:3.13-slim
+# Full ComfyUI installation with MinIO S3 integration for model storage
+FROM python:3.11-slim
 
 LABEL maintainer="MLOps Team"
 LABEL service="comfyui"
@@ -20,30 +21,49 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
     && mkdir -p /workspace && chown -R mlops:mlops /workspace
 
-# Python dependencies
+# Clone ComfyUI
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI \
+    && chown -R mlops:mlops /workspace/ComfyUI
+
+WORKDIR /workspace/ComfyUI
+
+# Python dependencies - CPU version
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cpu \
-    torch torchvision \
-    aiohttp einops Pillow numpy
+    torch torchvision torchaudio
 
-# Create directories
-RUN mkdir -p /workspace/comfyui/{models,input,output,custom_nodes} \
-    && chown -R mlops:mlops /workspace/comfyui
+# ComfyUI requirements
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy service files
-COPY --chown=mlops:mlops services/comfyui/server.py /workspace/comfyui/
-COPY --chown=mlops:mlops services/comfyui/config.yaml /workspace/comfyui/
+# Additional dependencies for S3 integration
+RUN pip install --no-cache-dir \
+    boto3>=1.34.0 \
+    s3fs>=2024.2.0 \
+    aiohttp>=3.9.0
+
+# Create directories for models and outputs
+RUN mkdir -p /workspace/ComfyUI/models/{checkpoints,clip,vae,loras,controlnet,upscale_models} \
+    && mkdir -p /workspace/ComfyUI/output \
+    && mkdir -p /workspace/ComfyUI/input \
+    && mkdir -p /workspace/ComfyUI/custom_nodes \
+    && chown -R mlops:mlops /workspace/ComfyUI
+
+# Copy S3 sync helper script
+COPY --chown=mlops:mlops services/comfyui/s3_sync.py /workspace/ComfyUI/
+COPY --chown=mlops:mlops services/comfyui/startup.sh /workspace/ComfyUI/
+
+RUN chmod +x /workspace/ComfyUI/startup.sh
 
 USER mlops
-WORKDIR /workspace/comfyui
+WORKDIR /workspace/ComfyUI
 
 ENV COMFYUI_PORT=8188
 ENV COMFYUI_HOST=0.0.0.0
 
 EXPOSE 8188
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8188/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8188/ || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "server.py"]
+CMD ["/workspace/ComfyUI/startup.sh"]

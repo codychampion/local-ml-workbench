@@ -16,6 +16,15 @@ from .vault import (
     get_database_url,
     init_vault_secrets,
 )
+from .model_registry import (
+    ModelRegistry,
+    ModelVersion,
+    ModelInfo,
+    get_registry,
+    register_model,
+    load_model,
+    list_models,
+)
 
 __all__ = [
     # AIM integration
@@ -35,4 +44,12 @@ __all__ = [
     "get_api_key",
     "get_database_url",
     "init_vault_secrets",
+    # Model registry
+    "ModelRegistry",
+    "ModelVersion",
+    "ModelInfo",
+    "get_registry",
+    "register_model",
+    "load_model",
+    "list_models",
 ]
