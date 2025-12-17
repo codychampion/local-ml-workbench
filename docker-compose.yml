@@ -37,17 +37,18 @@
 #   docker-compose run --rm infer <cmd>            # Run inference
 #
 # Web UIs:
-#   - MinIO Console: http://localhost:9001
-#   - AIM:           http://localhost:43800
-#   - Prefect:       http://localhost:4200
-#   - Label Studio:  http://localhost:8081
-#   - CVAT:          http://localhost:8082
-#   - Spotlight:     http://localhost:8083
-#   - FiftyOne:      http://localhost:5151
-#   - SiYuan:        http://localhost:6806 (code: mlops-dev)
-#   - ComfyUI:       http://localhost:8188
-#   - Vault:         http://localhost:8200
-#   - LiteLLM:       http://localhost:4000
+#   - MinIO Console:       http://localhost:9001
+#   - AIM:                 http://localhost:43800
+#   - Prefect:             http://localhost:4200
+#   - Label Studio:        http://localhost:8081
+#   - CVAT:                http://localhost:8082
+#   - Spotlight:           http://localhost:8083
+#   - Great Expectations:  http://localhost:8084
+#   - FiftyOne:            http://localhost:5151
+#   - SiYuan:              http://localhost:6806 (code: mlops-dev)
+#   - ComfyUI:             http://localhost:8188
+#   - Vault:               http://localhost:8200
+#   - LiteLLM:             http://localhost:4000
 #
 # =============================================================================
 
@@ -264,13 +265,16 @@ services:
           memory: 1G
 
   # ===========================================================================
-  # DATA LABELING - Label Studio (Images/Text)
+  # DATA LABELING - Label Studio (Images/Text) with MinIO S3 Backend
   # ===========================================================================
 
   label-studio:
     image: heartexlabs/label-studio:latest
     container_name: mlops-label-studio
     restart: unless-stopped
+    depends_on:
+      minio:
+        condition: service_healthy
     ports:
       - "8081:8080"
     volumes:
@@ -280,6 +284,13 @@ services:
     environment:
       - LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true
       - LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=/label-studio/files
+      # MinIO S3 Cloud Storage Backend
+      - LABEL_STUDIO_CLOUD_STORAGE_ENABLED=true
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT=http://minio:9000
+      - AWS_S3_REGION_NAME=us-east-1
+      - S3_USE_ACCELERATE_ENDPOINT=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -295,7 +306,7 @@ services:
           memory: 2G
 
   # ===========================================================================
-  # VIDEO ANNOTATION - CVAT (Computer Vision Annotation Tool)
+  # VIDEO ANNOTATION - CVAT (Computer Vision Annotation Tool) with MinIO S3
   # ===========================================================================
 
   cvat-server:
@@ -306,6 +317,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     volumes:
       - cvat-data:/home/django/data
@@ -320,6 +333,12 @@ services:
       - CVAT_POSTGRES_USER=mlops
       - CVAT_POSTGRES_PASSWORD=mlops_dev_password
       - CVAT_POSTGRES_DBNAME=cvat
+      # MinIO S3 Cloud Storage for CVAT
+      - CVAT_CLOUD_STORAGE_ENABLED=true
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_S3_REGION_NAME=us-east-1
     networks:
       - mlops-network
     deploy:
@@ -344,6 +363,10 @@ services:
       - CVAT_POSTGRES_USER=mlops
       - CVAT_POSTGRES_PASSWORD=mlops_dev_password
       - CVAT_POSTGRES_DBNAME=cvat
+      # MinIO S3 access for import worker
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
     networks:
       - mlops-network
     deploy:
@@ -368,6 +391,10 @@ services:
       - CVAT_POSTGRES_USER=mlops
       - CVAT_POSTGRES_PASSWORD=mlops_dev_password
       - CVAT_POSTGRES_DBNAME=cvat
+      # MinIO S3 access for export worker
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
     networks:
       - mlops-network
     deploy:
@@ -564,7 +591,7 @@ services:
           memory: 1G
 
   # ===========================================================================
-  # DATASET VISUALIZATION - FiftyOne
+  # DATASET VISUALIZATION - FiftyOne with MinIO S3 Backend
   # ===========================================================================
 
   fiftyone:
@@ -577,6 +604,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "5151:5151"
     volumes:
@@ -587,6 +616,12 @@ services:
       - FIFTYONE_APP_ADDRESS=0.0.0.0
       - FIFTYONE_APP_PORT=5151
       - FIFTYONE_DATABASE_URI=mongodb://mongodb:27017/fiftyone
+      # MinIO S3 Backend for FiftyOne
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+      - FIFTYONE_DEFAULT_DATASET_DIR=/workspace/fiftyone/datasets
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5151"]
       interval: 30s
@@ -602,8 +637,9 @@ services:
           memory: 4G
 
   # ===========================================================================
-  # COMFYUI - Image Generation Workflows
+  # COMFYUI - Image Generation Workflows with MinIO S3 Backend
   # ===========================================================================
+  # Using official ComfyUI image with S3 integration for model/output storage
 
   comfyui:
     build:
@@ -612,30 +648,86 @@ services:
     image: mlops-comfyui:latest
     container_name: mlops-comfyui
     restart: unless-stopped
+    depends_on:
+      minio:
+        condition: service_healthy
     ports:
       - "8188:8188"
     volumes:
-      - comfyui-models:/workspace/comfyui/models
-      - comfyui-output:/workspace/comfyui/output
+      - comfyui-models:/workspace/ComfyUI/models
+      - comfyui-output:/workspace/ComfyUI/output
+      - comfyui-input:/workspace/ComfyUI/input
       - ./models:/workspace/models:ro
       - juicefs-mount:/workspace/jfs:ro
     environment:
       - COMFYUI_HOST=0.0.0.0
       - COMFYUI_PORT=8188
       - COMPUTE_DEVICE=cpu
+      # MinIO S3 Backend for models and outputs
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+      - S3_MODELS_BUCKET=mlops-models
+      - S3_OUTPUTS_BUCKET=mlops-outputs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8188/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8188/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 60s
+    networks:
+      - mlops-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # ===========================================================================
+  # DATA QUALITY - Great Expectations
+  # ===========================================================================
+  # Self-hosted data validation and quality checks
+
+  great-expectations:
+    build:
+      context: .
+      dockerfile: services/great_expectations/Dockerfile
+    image: mlops-great-expectations:latest
+    container_name: mlops-great-expectations
+    restart: unless-stopped
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    volumes:
+      - great-expectations-data:/workspace/great_expectations
+      - ./data:/workspace/data:ro
+      - juicefs-mount:/workspace/jfs:ro
+    environment:
+      # MinIO S3 Backend for expectations and validation results
+      - AWS_ACCESS_KEY_ID=mlops-admin
+      - AWS_SECRET_ACCESS_KEY=mlops-dev-password
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+      - GE_USAGE_STATISTICS_ENABLED=false
+      - GE_DATASOURCE_DEFAULT_BUCKET=mlops-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - mlops-network
     deploy:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          memory: 2G
 
   # ===========================================================================
   # PIPELINE STAGES (run with: docker-compose run --rm <stage> <command>)
@@ -903,8 +995,10 @@ volumes:
   fiftyone-data:
   comfyui-models:
   comfyui-output:
+  comfyui-input:
   huggingface-cache:
   siyuan-data:
+  great-expectations-data:
 
 # =============================================================================
 # NETWORKS
