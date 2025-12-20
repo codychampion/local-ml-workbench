@@ -3,8 +3,7 @@
 # PostgreSQL Multiple Database Initialization
 # =============================================================================
 # Creates multiple databases for different services:
-#   - cvat: CVAT video annotation
-#   - vault: HashiCorp Vault (if using PostgreSQL backend)
+#   - khoj: Khoj AI assistant
 #   - litellm: LiteLLM API gateway
 #
 # This script is automatically run on first PostgreSQL container startup.
