@@ -256,9 +256,6 @@ services:
     restart: unless-stopped
     ports:
       - "8200:8200"
-    volumes:
-      - vault-data:/vault/data
-      - ./docker/vault/config:/vault/config:ro
     environment:
       - VAULT_DEV_ROOT_TOKEN_ID=mlops-dev-token
       - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
@@ -858,7 +855,6 @@ volumes:
   postgres-data:
   aim-data:
   label-studio-data:
-  vault-data:
   prefect-data:
   fiftyone-data:
   huggingface-cache:
