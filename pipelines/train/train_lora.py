@@ -26,6 +26,14 @@ try:
 except ImportError:
     AIM_AVAILABLE = False
 
+# Optional Hydra integration for config-driven runs
+try:
+    import hydra
+    from omegaconf import DictConfig
+except ImportError:
+    hydra = None
+    DictConfig = Any
+
 
 class SymbolicLoRAModel(nn.Module):
     """Symbolic LoRA model for testing."""
@@ -144,5 +152,36 @@ def main():
                  learning_rate=args.lr, lora_rank=args.lora_rank, seed=args.seed)
 
 
+def _run_from_hydra(cfg: "DictConfig"):
+    """
+    Launch training using Hydra config files so experiments stay reproducible.
+    """
+    train_cfg = cfg.get("train", {})
+    lora_cfg = cfg.get("lora", {})
+    paths_cfg = cfg.get("paths", {})
+    compute_cfg = cfg.get("compute", {})
+
+    output_dir = Path(paths_cfg.get("checkpoints", "./outputs/lora-checkpoints"))
+
+    run_training(
+        output_dir=output_dir,
+        num_epochs=train_cfg.get("epochs", 10),
+        batch_size=train_cfg.get("batch_size", 16),
+        learning_rate=train_cfg.get("learning_rate", 1e-4),
+        lora_rank=lora_cfg.get("rank", 8),
+        dataset_size=train_cfg.get("dataset_size", 100),
+        seed=compute_cfg.get("seed", 42),
+    )
+
+
+if hydra is not None:
+    @hydra.main(config_path="../../conf", config_name="config")
+    def hydra_main(cfg: "DictConfig"):  # type: ignore[misc]
+        _run_from_hydra(cfg)
+
+
 if __name__ == "__main__":
-    main()
+    if hydra is not None and "--hydra" in sys.argv:
+        hydra_main()
+    else:
+        main()

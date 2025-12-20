@@ -18,7 +18,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 # Prefect for workflow orchestration
 try:
@@ -39,6 +39,15 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config import get_config
+from utils.hydra_aim import init_aim_from_hydra
+
+# Optional Hydra integration
+try:
+    import hydra
+    from omegaconf import DictConfig
+except ImportError:
+    hydra = None
+    DictConfig = Any
 
 
 @task(name="collect-subreddit", retries=2, retry_delay_seconds=30)
