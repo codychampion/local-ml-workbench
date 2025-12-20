@@ -42,11 +42,14 @@ services:
     image: pgvector/pgvector:pg15
     profiles: [chat]
     restart: unless-stopped
-    volumes: [postgres-data:/var/lib/postgresql/data]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/init-scripts/create-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multi.sh:ro
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-mlops}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlops_dev_password}
       POSTGRES_DB: khoj
+      POSTGRES_MULTIPLE_DATABASES: khoj,mlops
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U mlops"], interval: 10s, timeout: 5s, retries: 5}
     networks: [mlops-network]
 
@@ -71,6 +74,10 @@ services:
       POSTGRES_DB: khoj
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Offline-friendly defaults to avoid blocking startup when huggingface is unreachable
+      HF_HUB_OFFLINE: "1"
+      DISABLE_MODEL_DOWNLOADS: "1"
+      ANONYMOUS_MODE: "true"
     networks: [mlops-network]
 
   # === CV_UI PROFILE ===
