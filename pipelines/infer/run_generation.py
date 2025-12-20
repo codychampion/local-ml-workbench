@@ -321,10 +321,8 @@ def main():
     print("=" * 60)
     print(f"Generated images: {len(generated_paths)}")
     print(f"Output directory: {args.output_dir}")
-    print(f"W&B mode: offline (Phase 1)")
-    print(f"Storage: Mocked B2 (Phase 1)")
-    print("\nTo view W&B results offline, run:")
-    print("  wandb sync ./outputs/wandb/offline-*")
+    print(f"Tracking: AIM (http://localhost:43800)")
+    print(f"Storage: MinIO S3 (http://localhost:9001)")
     print("=" * 60)
 
 
