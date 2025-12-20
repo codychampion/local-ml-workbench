@@ -1,15 +1,24 @@
 # =============================================================================
 # MLOps Dev Container with Diffusers
 # =============================================================================
-FROM python:3.13-slim
+# Full ML stack for development with diffusers, transformers, etc.
+#
+# Build: docker build -t mlops-diffusers:latest -f docker/base/Dockerfile.diffusers .
+# =============================================================================
+
+FROM python:3.12-slim
 
 LABEL maintainer="MLOps Team"
 LABEL description="Development container with full ML stack"
+LABEL version="2.0.0"
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /workspace
+
+# Install uv for fast package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,18 +30,17 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
     && mkdir -p /workspace && chown -R mlops:mlops /workspace
 
 # Python dependencies - full stack
-RUN pip install --no-cache-dir \
+RUN uv pip install --system --no-cache \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch torchvision torchaudio \
-    wandb fiftyone b2sdk \
     transformers diffusers accelerate safetensors \
+    fiftyone boto3 \
     Pillow numpy scipy pandas scikit-learn \
     python-dotenv pyyaml requests tqdm
 
 USER mlops
 
 ENV COMPUTE_DEVICE=cpu
-ENV WANDB_MODE=offline
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/bin/bash"]

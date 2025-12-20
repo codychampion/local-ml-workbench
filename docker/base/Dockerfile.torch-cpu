@@ -1,44 +1,42 @@
 # =============================================================================
 # MLOps PyTorch CPU Image
 # =============================================================================
-# Extends base image with PyTorch (CPU-only) for Phase 1 development.
+# Extends base image with PyTorch (CPU-only) for development.
 # No CUDA dependencies - optimized for local/CI environments.
 #
 # Build: docker build -t mlops-torch-cpu:latest -f docker/base/Dockerfile.torch-cpu .
 # =============================================================================
 
-ARG BASE_IMAGE=mlops-base:latest
-FROM ${BASE_IMAGE}
+FROM python:3.12-slim
 
 LABEL maintainer="MLOps Team"
-LABEL description="MLOps PyTorch CPU image for Phase 1 development"
-LABEL version="1.0.0"
-LABEL phase="1-local-core"
+LABEL description="MLOps PyTorch CPU image"
+LABEL version="2.0.0"
 
-# Install PyTorch CPU-only
-RUN pip install \
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /workspace
+
+# Install uv for fast package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl tini libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
+    && mkdir -p /workspace && chown -R mlops:mlops /workspace
+
+# Install PyTorch CPU and ML libraries
+RUN uv pip install --system --no-cache \
     --extra-index-url https://download.pytorch.org/whl/cpu \
-    torch>=2.0.0 \
-    torchvision>=0.15.0 \
-    torchaudio>=2.0.0
+    torch torchvision torchaudio \
+    numpy scipy scikit-learn pandas Pillow \
+    boto3 "dvc[s3]>=3.0.0"
 
-# Install common ML libraries
-RUN pip install \
-    numpy>=1.24.0 \
-    scipy>=1.11.0 \
-    scikit-learn>=1.3.0 \
-    pandas>=2.0.0 \
-    Pillow>=10.0.0
-
-# Install experiment tracking
-RUN pip install \
-    wandb>=0.16.0
-
-# Install cloud storage SDK
-RUN pip install \
-    b2sdk>=1.24.0
-
-# Set CPU-specific environment
 ENV COMPUTE_DEVICE=cpu
 ENV OMP_NUM_THREADS=4
 ENV MKL_NUM_THREADS=4
@@ -46,4 +44,5 @@ ENV MKL_NUM_THREADS=4
 # Verify installation
 RUN python -c "import torch; print(f'PyTorch {torch.__version__} (CPU)')"
 
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/bin/bash"]

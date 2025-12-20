@@ -479,11 +479,9 @@ def main():
     print(f"Processed samples: {len(dataset)}")
     print(f"Output directory: {args.output_dir}")
     print(f"FiftyOne dataset: {dataset.name}")
-    print(f"W&B mode: offline (Phase 1)")
+    print(f"Tracking: AIM (http://localhost:43800)")
     print("\nTo view results in FiftyOne, run:")
     print(f"  python -c \"import fiftyone as fo; fo.load_dataset('{dataset.name}').launch()\"")
-    print("\nTo sync W&B results, run:")
-    print("  wandb sync ./outputs/wandb/offline-*")
     print("=" * 60)
 
 

@@ -4,11 +4,14 @@ MLOps Workspace Configuration
 Central configuration module using environment variables with sensible defaults.
 All sensitive credentials should be set via environment variables or retrieved from Vault.
 
+NOTE: Prefer Hydra configuration (conf/) for new code. This module is for
+legacy compatibility and simple scripts.
+
 Infrastructure:
-  - AIM: Experiment tracking (self-hosted)
-  - JuiceFS: Distributed storage
+  - AIM: Experiment tracking (self-hosted, replaces W&B)
   - Vault: Secrets management
   - LiteLLM: LLM API gateway
+  - MinIO/S3: Object storage (use S3Client from data_transfer/)
 """
 
 import os
@@ -57,23 +60,6 @@ class VaultConfig:
 
 
 @dataclass
-class JuiceFSConfig:
-    """JuiceFS distributed storage configuration."""
-
-    mount_point: Path = field(default_factory=lambda: Path(os.getenv("JUICEFS_MOUNT", "/workspace/jfs")))
-    metadata_url: str = field(default_factory=lambda: os.getenv("JUICEFS_METADATA", "redis://redis:6379/1"))
-
-    # Cache settings
-    cache_dir: Path = field(default_factory=lambda: Path(os.getenv("JUICEFS_CACHE_DIR", "/tmp/jfs-cache")))
-    cache_size_mb: int = field(default_factory=lambda: int(os.getenv("JUICEFS_CACHE_SIZE", "10240")))
-
-    @property
-    def is_mounted(self) -> bool:
-        """Check if JuiceFS is mounted."""
-        return self.mount_point.exists() and self.mount_point.is_dir()
-
-
-@dataclass
 class LiteLLMConfig:
     """LiteLLM API gateway configuration."""
 
@@ -85,30 +71,23 @@ class LiteLLMConfig:
 
 
 @dataclass
-class B2Config:
-    """Backblaze B2 storage configuration (legacy, prefer JuiceFS)."""
+class S3Config:
+    """S3-compatible storage configuration (MinIO, AWS S3, Backblaze B2)."""
 
-    application_key_id: Optional[str] = field(
-        default_factory=lambda: os.getenv("B2_APPLICATION_KEY_ID")
+    endpoint: str = field(
+        default_factory=lambda: os.getenv("S3_ENDPOINT", "http://minio:9000")
     )
-    application_key: Optional[str] = field(
-        default_factory=lambda: os.getenv("B2_APPLICATION_KEY")
+    access_key: Optional[str] = field(
+        default_factory=lambda: os.getenv("S3_ACCESS_KEY", "mlops-admin")
     )
-    bucket_name: str = field(
-        default_factory=lambda: os.getenv("B2_BUCKET_NAME", "mlops-data-bucket")
+    secret_key: Optional[str] = field(
+        default_factory=lambda: os.getenv("S3_SECRET_KEY", "mlops-dev-password")
     )
-
-    # Local mock paths
-    local_manifest_path: Path = field(
-        default_factory=lambda: Path(os.getenv("B2_LOCAL_MANIFEST", ".b2_local_manifest.json"))
+    default_bucket: str = field(
+        default_factory=lambda: os.getenv("S3_DEFAULT_BUCKET", "mlops-data")
     )
-    local_data_dir: Path = field(
-        default_factory=lambda: Path(os.getenv("B2_LOCAL_DATA_DIR", "./data/raw"))
-    )
-
-    # Rate limiting configuration
-    max_requests_per_minute: int = field(
-        default_factory=lambda: int(os.getenv("B2_MAX_REQUESTS_PER_MIN", "100"))
+    region: str = field(
+        default_factory=lambda: os.getenv("S3_REGION", "us-east-1")
     )
 
 
@@ -159,14 +138,13 @@ class ProjectPaths:
 class Config:
     """Main configuration container."""
 
-    # New services
+    # Core services
     aim: AIMConfig = field(default_factory=AIMConfig)
     vault: VaultConfig = field(default_factory=VaultConfig)
-    juicefs: JuiceFSConfig = field(default_factory=JuiceFSConfig)
     litellm: LiteLLMConfig = field(default_factory=LiteLLMConfig)
 
-    # Data services
-    b2: B2Config = field(default_factory=B2Config)
+    # Storage and data services
+    s3: S3Config = field(default_factory=S3Config)
     fiftyone: FiftyOneConfig = field(default_factory=FiftyOneConfig)
 
     # Compute
