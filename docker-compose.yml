@@ -150,7 +150,7 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # PostgreSQL - Backend for CVAT and Vault
+  # PostgreSQL - Backend for Khoj and LiteLLM
   postgres:
     image: postgres:15-alpine
     container_name: mlops-postgres
@@ -161,7 +161,7 @@ services:
     environment:
       - POSTGRES_USER=mlops
       - POSTGRES_PASSWORD=mlops_dev_password
-      - POSTGRES_MULTIPLE_DATABASES=cvat,vault
+      - POSTGRES_MULTIPLE_DATABASES=khoj,litellm
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mlops"]
       interval: 10s
