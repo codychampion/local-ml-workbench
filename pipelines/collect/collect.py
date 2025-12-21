@@ -39,6 +39,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from config import get_config
+from utils.manifest import create_collection_manifest
 
 
 @task(name="collect-subreddit", retries=2, retry_delay_seconds=30)
@@ -166,6 +167,22 @@ class DataCollector:
         }
         self.collected_items.append(collection_info)
 
+        # Create collection manifest
+        manifest = create_collection_manifest(
+            output_dir=sub_output,
+            source="reddit",
+            source_url=url,
+            metadata={
+                "subreddit": subreddit,
+                "limit": limit,
+                "sort": sort,
+                "time_range": time_range,
+                "images": len(images),
+                "videos": len(videos)
+            }
+        )
+        collection_info["manifest_id"] = manifest["id"]
+
         return images + videos
 
     def collect_url(self, url: str) -> list:
@@ -201,6 +218,18 @@ class DataCollector:
 
         collected = list(sub_output.glob("*.*"))
         print(f"Collected {len(collected)} files to {sub_output}")
+
+        # Create collection manifest
+        manifest = create_collection_manifest(
+            output_dir=sub_output,
+            source="url",
+            source_url=url,
+            metadata={
+                "url": url,
+                "url_hash": url_hash,
+                "total_files": len(collected)
+            }
+        )
 
         return collected
 

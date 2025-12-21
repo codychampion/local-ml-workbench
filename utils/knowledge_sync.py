@@ -26,6 +26,7 @@ from typing import Optional, Dict, Any, List
 # Configuration
 KNOWLEDGE_DIR = Path(os.environ.get("KNOWLEDGE_DIR", "./knowledge"))
 AIM_REPO = os.environ.get("AIM_REPO", "./outputs/aim")
+DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 
 # Service URLs
 ZOTERO_URL = os.environ.get("ZOTERO_URL", "http://localhost:8085")
@@ -37,7 +38,7 @@ REPO_URL = os.environ.get("REPO_URL", "https://github.com/your-org/ml_workbench"
 
 def ensure_dirs():
     """Ensure knowledge directories exist."""
-    for subdir in ["papers", "experiments", "datasets", "models", "results"]:
+    for subdir in ["papers", "experiments", "datasets", "models", "results", "collections", "annotations"]:
         (KNOWLEDGE_DIR / subdir).mkdir(parents=True, exist_ok=True)
 
 
@@ -462,6 +463,247 @@ print(dataset)
 
 
 # =============================================================================
+# Collection & Annotation Sync
+# =============================================================================
+
+def sync_collections():
+    """Sync collection manifests to knowledge base."""
+    try:
+        from utils.manifest import find_all_collections
+    except ImportError:
+        print("Manifest utilities not available, skipping collection sync")
+        return []
+
+    collections = find_all_collections(DATA_DIR)
+    synced = []
+
+    for collection in collections:
+        try:
+            filepath = create_collection_markdown(collection)
+            synced.append(filepath)
+        except Exception as e:
+            print(f"Error syncing collection {collection.get('id')}: {e}")
+
+    print(f"Synced {len(synced)} collections")
+    return synced
+
+
+def create_collection_markdown(manifest: Dict[str, Any]) -> Path:
+    """Create markdown file from collection manifest."""
+    collection_id = manifest["id"]
+    created = datetime.fromisoformat(manifest["created_at"])
+    source = manifest.get("source", {})
+    storage = manifest.get("storage", {})
+    git = manifest.get("git", {})
+    annotations = manifest.get("annotations", [])
+
+    filename = f"{slugify(collection_id)}.md"
+    filepath = KNOWLEDGE_DIR / "collections" / filename
+
+    # Format source metadata
+    source_metadata = source.get("metadata", {})
+    source_meta_str = "\n".join(f"  - **{k}**: `{v}`" for k, v in source_metadata.items())
+
+    # Format annotations
+    if annotations:
+        annotations_str = "\n".join(
+            f"- `{ann['id']}`: {ann['type']} using **{ann['model']}** ({ann.get('created_at', 'N/A')})"
+            for ann in annotations
+        )
+    else:
+        annotations_str = "*No annotations yet*"
+
+    content = f"""---
+type: collection
+collection_id: "{collection_id}"
+source_type: "{source.get('type', 'unknown')}"
+source_url: "{source.get('url', '')}"
+date: {created.strftime('%Y-%m-%d')}
+total_images: {storage.get('images', 0)}
+total_videos: {storage.get('videos', 0)}
+total_files: {storage.get('total_files', 0)}
+
+# Code Traceability
+git:
+  commit: "{git.get('commit', '')}"
+  commit_short: "{git.get('commit_short', '')}"
+  branch: "{git.get('branch', '')}"
+  dirty: {str(git.get('dirty', False)).lower()}
+
+tags:
+  - collection
+  - {source.get('type', 'data')}
+  - auto-generated
+---
+
+# Collection: {collection_id}
+
+**ID:** `{collection_id}`
+**Created:** {created.strftime('%Y-%m-%d %H:%M')}
+**Source:** {source.get('type', 'unknown')} - {source.get('url', 'N/A')}
+
+## Contents
+
+- **Images:** {storage.get('images', 0)}
+- **Videos:** {storage.get('videos', 0)}
+- **Total Files:** {storage.get('total_files', 0)}
+- **Path:** `{storage.get('path', 'N/A')}`
+
+## Source Details
+
+{source_meta_str or '*No additional metadata*'}
+
+## Annotations
+
+{annotations_str}
+
+## Code State
+
+**Commit:** `{git.get('commit_short', 'unknown')}` on branch `{git.get('branch', 'unknown')}`
+**Working Directory:** {"⚠️ Modified (dirty)" if git.get('dirty') else "✓ Clean"}
+
+## Usage
+
+```bash
+# View collection
+ls {storage.get('path', '.')}
+
+# Caption this collection
+docker-compose run --rm annotate python -m pipelines.annotate.caption \\
+    --input-dir {storage.get('path', '.')} \\
+    --model blip-base
+
+# Create FiftyOne dataset
+docker-compose run --rm annotate python -m pipelines.annotate.create_dataset \\
+    --input-dir {storage.get('path', '.')} \\
+    --name {collection_id}
+```
+
+## Notes
+
+*Auto-synced from manifest on {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+
+## Related
+- [[]]
+"""
+
+    filepath.write_text(content)
+    return filepath
+
+
+def sync_annotations():
+    """Sync annotation manifests to knowledge base."""
+    try:
+        from utils.manifest import find_all_annotations
+    except ImportError:
+        print("Manifest utilities not available, skipping annotation sync")
+        return []
+
+    annotations = find_all_annotations(DATA_DIR)
+    synced = []
+
+    for annotation in annotations:
+        try:
+            filepath = create_annotation_markdown(annotation)
+            synced.append(filepath)
+        except Exception as e:
+            print(f"Error syncing annotation {annotation.get('id')}: {e}")
+
+    print(f"Synced {len(synced)} annotations")
+    return synced
+
+
+def create_annotation_markdown(manifest: Dict[str, Any]) -> Path:
+    """Create markdown file from annotation manifest."""
+    annotation_id = manifest["id"]
+    created = datetime.fromisoformat(manifest["created_at"])
+    collection = manifest.get("collection", {})
+    annotation = manifest.get("annotation", {})
+    storage = manifest.get("storage", {})
+    git = manifest.get("git", {})
+
+    filename = f"{slugify(annotation_id)}.md"
+    filepath = KNOWLEDGE_DIR / "annotations" / filename
+
+    # Format annotation metadata
+    ann_metadata = annotation.get("metadata", {})
+    ann_meta_str = "\n".join(f"  - **{k}**: `{v}`" for k, v in ann_metadata.items())
+
+    content = f"""---
+type: annotation
+annotation_id: "{annotation_id}"
+collection_id: "{collection.get('id', 'unknown')}"
+annotation_type: "{annotation.get('type', 'unknown')}"
+model: "{annotation.get('model', 'unknown')}"
+date: {created.strftime('%Y-%m-%d')}
+total_annotations: {storage.get('annotation_files', 0)}
+
+# Code Traceability
+git:
+  commit: "{git.get('commit', '')}"
+  commit_short: "{git.get('commit_short', '')}"
+  branch: "{git.get('branch', '')}"
+  dirty: {str(git.get('dirty', False)).lower()}
+
+tags:
+  - annotation
+  - {annotation.get('type', 'caption')}
+  - auto-generated
+---
+
+# Annotation: {annotation_id}
+
+**ID:** `{annotation_id}`
+**Created:** {created.strftime('%Y-%m-%d %H:%M')}
+**Type:** {annotation.get('type', 'unknown')}
+**Model:** `{annotation.get('model', 'unknown')}`
+
+## Parent Collection
+
+**Collection ID:** `{collection.get('id', 'unknown')}`
+**Path:** `{collection.get('path', 'N/A')}`
+
+See: [[{slugify(collection.get('id', 'unknown'))}]]
+
+## Details
+
+- **Annotation Files:** {storage.get('annotation_files', 0)}
+- **Storage Path:** `{storage.get('path', 'N/A')}`
+
+## Metadata
+
+{ann_meta_str or '*No additional metadata*'}
+
+## Code State
+
+**Commit:** `{git.get('commit_short', 'unknown')}` on branch `{git.get('branch', 'unknown')}`
+**Working Directory:** {"⚠️ Modified (dirty)" if git.get('dirty') else "✓ Clean"}
+
+## Usage
+
+```bash
+# View annotations
+ls {storage.get('path', '.')}
+
+# Train on this dataset
+docker-compose run --rm train python -m pipelines.train.finetune \\
+    --dataset {storage.get('path', '.')} \\
+    --epochs 3
+```
+
+## Notes
+
+*Auto-synced from manifest on {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+
+## Related
+- [[{slugify(collection.get('id', 'unknown'))}]]
+"""
+
+    filepath.write_text(content)
+    return filepath
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -471,11 +713,13 @@ def sync_all():
     sync_aim_experiments()
     sync_zotero_papers()
     sync_fiftyone_datasets()
+    sync_collections()
+    sync_annotations()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Sync MLOps services to knowledge base")
-    parser.add_argument("--source", choices=["aim", "zotero", "fiftyone", "all"], default="all")
+    parser.add_argument("--source", choices=["aim", "zotero", "fiftyone", "collections", "annotations", "all"], default="all")
     parser.add_argument("--watch", action="store_true", help="Watch for changes")
     parser.add_argument("--interval", type=int, default=60, help="Watch interval in seconds")
 
@@ -500,6 +744,10 @@ def main():
             sync_zotero_papers()
         elif args.source == "fiftyone":
             sync_fiftyone_datasets()
+        elif args.source == "collections":
+            sync_collections()
+        elif args.source == "annotations":
+            sync_annotations()
 
 
 if __name__ == "__main__":

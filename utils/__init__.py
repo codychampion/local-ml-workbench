@@ -25,6 +25,15 @@ from .model_registry import (
     load_model,
     list_models,
 )
+from .manifest import (
+    create_collection_manifest,
+    create_annotation_manifest,
+    load_collection_manifest,
+    load_annotation_manifest,
+    find_all_collections,
+    find_all_annotations,
+    get_collection_tree,
+)
 
 __all__ = [
     # AIM integration
@@ -52,4 +61,12 @@ __all__ = [
     "register_model",
     "load_model",
     "list_models",
+    # Dataset manifests
+    "create_collection_manifest",
+    "create_annotation_manifest",
+    "load_collection_manifest",
+    "load_annotation_manifest",
+    "find_all_collections",
+    "find_all_annotations",
+    "get_collection_tree",
 ]

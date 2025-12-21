@@ -24,7 +24,9 @@ import torch
 
 # Support both direct execution and module execution (-m)
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from models import get_model_config, list_models, MODELS
+from utils.manifest import create_annotation_manifest, load_collection_manifest
 
 
 class ImageCaptioner:
@@ -324,6 +326,32 @@ def main():
     print(f"Processed: {len(results)} images")
     print(f"Successful: {successful}")
     print(f"Failed: {len(results) - successful}")
+
+    # Create annotation manifest
+    # Try to load collection manifest from input directory
+    collection_manifest = load_collection_manifest(args.input_dir)
+    collection_id = collection_manifest["id"] if collection_manifest else "unknown"
+
+    # Determine model name for manifest
+    model_name = args.model if not custom_path else f"custom:{custom_path.name}"
+
+    annotation_manifest = create_annotation_manifest(
+        collection_id=collection_id,
+        annotation_type="caption",
+        model=model_name,
+        output_dir=args.input_dir,  # Captions stored alongside images
+        metadata={
+            "total_processed": len(results),
+            "successful": successful,
+            "failed": len(results) - successful,
+            "output_format": args.output_format,
+            "prompt": args.prompt,
+            "device": args.device
+        },
+        collection_path=args.input_dir if collection_manifest else None
+    )
+
+    print(f"\n✓ Annotation manifest: {annotation_manifest['id']}")
 
 
 if __name__ == "__main__":
