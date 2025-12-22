@@ -1,77 +1,24 @@
 # =============================================================================
 # Pipeline Configuration - CUAD Dataset Collection
 # =============================================================================
-# Contract Understanding Atticus Dataset (CUAD) for legal contract analysis
-# Dataset: https://huggingface.co/datasets/theatticusproject/cuad
-#
-# Usage (CLI):
-#   python -m pipelines.collect.collect_hf --dataset theatticusproject/cuad --split train --limit 1000
-#
-# Usage (Hydra):
-#   python -m pipelines.collect.collect_cuad pipeline=collect_cuad
-# =============================================================================
 
 collect_cuad:
-  # Dataset configuration
-  dataset: "theatticusproject/cuad"
-  split: train
-  limit: 1000  # Limit for initial testing, set to -1 for full dataset (84,325 samples)
+  source:
+    dataset: "theatticusproject/cuad"
+    split: train
+    limit: 1000  # -1 for full dataset (84,325 samples)
 
-  # Column configuration for CUAD dataset
-  text_column: text  # Primary text column containing clause content
-  id_column: null  # Will auto-generate IDs if not present
+  filter:
+    text_column: text
+    id_column: null
+    max_text_length: 8000
 
-  # Output configuration
-  output_dir: ${paths.data.collected}/cuad
-  save_metadata: true
+  output:
+    dir: ${paths.data.collected}/cuad
+    save_metadata: true
 
-  # CUAD-specific settings
-  clause_categories:
-    # 41 clause categories from CUAD dataset
-    - "Anti-Assignment"
-    - "Audit Rights"
-    - "Cap On Liability"
-    - "Change Of Control"
-    - "Competitive Restriction Exception"
-    - "Covenant Not To Sue"
-    - "Document Name"
-    - "Effective Date"
-    - "Expiration Date"
-    - "Governing Law"
-    - "Insurance"
-    - "IP Ownership Assignment"
-    - "Joint IP Ownership"
-    - "License Grant"
-    - "Liquidated Damages"
-    - "Minimum Commitment"
-    - "Most Favored Nation"
-    - "Non-Compete"
-    - "Non-Disparagement"
-    - "Non-Solicit Of Customers"
-    - "Non-Solicit Of Employees"
-    - "No-Solicit Of Customers"
-    - "Notice Period To Terminate Renewal"
-    - "Post-Termination Services"
-    - "Price Restrictions"
-    - "Renewal Term"
-    - "Revenue/Profit Sharing"
-    - "Rofr/Rofo/Rofn"
-    - "Source Code Escrow"
-    - "Termination For Convenience"
-    - "Third Party Beneficiary"
-    - "Uncapped Liability"
-    - "Unlimited/All-You-Can-Eat-License"
-    - "Volume Restriction"
-    - "Warranty Duration"
-
-  # Processing options
-  processing:
-    max_text_length: 8000  # Max character length for contract text
-    extract_entities: true  # Whether to extract entity information
-    binary_classification: true  # Enable binary classification for clause presence
-
-  # Task configuration for MAKER-style decomposition
-  task_decomposition:
-    enabled: true
-    granularity: "clause_level"  # Options: contract_level, clause_level, sentence_level
-    voting_threshold: 3  # k value for first-to-ahead-by-k voting
+  # MAKER experiment settings
+  maker:
+    enabled: false  # Enable to prepare for MAKER experiments
+    voting_threshold: 3  # k value for first-to-ahead-by-k
+    granularity: clause_level  # contract_level | clause_level | sentence_level
