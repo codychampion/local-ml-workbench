@@ -41,16 +41,8 @@ def get_git_info() -> Dict[str, Any]:
     """
     Get current git state for experiment traceability.
 
-    Returns comprehensive git information including:
-    - Commit hash (full and short)
-    - Branch name
-    - Commit message, author, and date
-    - Dirty status (uncommitted changes)
-    - Modified and uncommitted files
-    - Repository URL and commit links
-
-    Returns:
-        Dictionary containing git metadata
+    Returns dict with commit hash, branch, author, dirty status, file changes,
+    and repo URLs for linking to commits.
     """
     commit = _run_git(["rev-parse", "HEAD"])
     commit_short = _run_git(["rev-parse", "--short", "HEAD"])
