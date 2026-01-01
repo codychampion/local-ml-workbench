@@ -17,20 +17,9 @@ import sys
 from pathlib import Path
 from typing import Optional, Any, Dict
 
-# No-op decorators (Prefect removed)
-def flow(*args, **kwargs):
-    def decorator(fn):
-        return fn
-    return decorator if not args or callable(args[0]) else decorator
-
-def task(*args, **kwargs):
-    def decorator(fn):
-        return fn
-    return decorator if not args or callable(args[0]) else decorator
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from config import get_config
+from utils.decorators import flow, task
 from utils.hydra_aim import init_aim_from_hydra
 from utils.manifest import record_collection_manifest
 

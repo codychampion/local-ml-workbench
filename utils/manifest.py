@@ -17,25 +17,12 @@ from utils.git_utils import get_git_info
 
 
 def _default_manifest_dir() -> Path:
-    """
-    Get default manifest directory from environment or use default path.
-
-    Returns:
-        Path to manifest directory
-    """
+    """Get manifest directory from env MANIFEST_DIR or default path."""
     return Path(os.environ.get("MANIFEST_DIR", "./knowledge/datasets/manifests"))
 
 
 def _slugify(text: str) -> str:
-    """
-    Convert text to slug format (lowercase, alphanumeric + hyphens/underscores).
-
-    Args:
-        text: Text to slugify
-
-    Returns:
-        Slugified text suitable for filenames
-    """
+    """Convert text to slug: lowercase alphanumeric with hyphens/underscores."""
     return "".join(c if c.isalnum() or c in "-_" else "-" for c in text.lower()).strip("-")
 
 
@@ -68,17 +55,7 @@ class AnnotationManifest:
 
 
 def write_manifest(manifest: Dict[str, Any], manifest_dir: Optional[Path] = None, sidecar: Optional[Path] = None) -> Path:
-    """
-    Write manifest to knowledge base and optionally create sidecar copy.
-
-    Args:
-        manifest: Manifest dictionary to write
-        manifest_dir: Directory for manifest (defaults to knowledge/datasets/manifests)
-        sidecar: Optional path for sidecar manifest in data directory
-
-    Returns:
-        Path to written manifest file
-    """
+    """Write manifest to knowledge base with optional sidecar copy in data dir."""
     manifest_dir = manifest_dir or _default_manifest_dir()
     manifest_dir.mkdir(parents=True, exist_ok=True)
     target = manifest_dir / f"{manifest['id']}.json"
@@ -96,25 +73,7 @@ def record_collection_manifest(
     counts: Dict[str, Any],
     cfg: Optional[Any] = None,
 ) -> Path:
-    """
-    Create and write a collection manifest for dataset provenance.
-
-    Manifests track:
-    - Collection source and parameters
-    - Sample counts and statistics
-    - Git state for reproducibility
-    - Optional Hydra config snapshot
-
-    Args:
-        name: Human-readable collection name
-        output_dir: Directory where data was collected
-        source: Source information (type, URL, parameters)
-        counts: Sample counts and statistics
-        cfg: Optional Hydra DictConfig for config snapshot
-
-    Returns:
-        Path to written manifest file
-    """
+    """Create collection manifest tracking source, counts, git state, and config."""
     ts = datetime.now()
     manifest_id = f"col-{ts.strftime('%Y%m%d-%H%M%S')}-{_slugify(name) or 'collection'}"
     config_snapshot = None
@@ -140,17 +99,7 @@ def record_collection_manifest(
 
 
 def find_parent_collection_id(path: Path) -> Optional[str]:
-    """
-    Walk up directory tree looking for a collection_manifest.json.
-
-    This allows annotation/processing steps to link back to their source collection.
-
-    Args:
-        path: Starting directory path
-
-    Returns:
-        Collection ID if found, None otherwise
-    """
+    """Walk up dirs to find collection_manifest.json and return its ID."""
     for candidate in [path] + list(path.parents):
         manifest_path = candidate / "collection_manifest.json"
         if manifest_path.exists():
@@ -171,24 +120,7 @@ def record_annotation_manifest(
     parent_collection_id: Optional[str] = None,
     cfg: Optional[Any] = None,
 ) -> Path:
-    """
-    Create and write an annotation manifest for processing provenance.
-
-    Annotation manifests track data transformations (captioning, labeling, etc.)
-    and link back to source collections for full data lineage.
-
-    Args:
-        name: Human-readable annotation task name
-        input_dir: Directory containing input data
-        output_dir: Directory where annotations/outputs were written
-        params: Processing parameters (model, settings, etc.)
-        counts: Processing statistics (successful, failed, etc.)
-        parent_collection_id: Optional ID of source collection
-        cfg: Optional Hydra DictConfig for config snapshot
-
-    Returns:
-        Path to written manifest file
-    """
+    """Create annotation manifest tracking transformations and linking to source collection."""
     ts = datetime.now()
     manifest_id = f"ann-{ts.strftime('%Y%m%d-%H%M%S')}-{_slugify(name) or 'annotation'}"
     config_snapshot = None
