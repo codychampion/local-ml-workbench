@@ -66,6 +66,30 @@ docker compose --profile llm --profile llm-vision up -d
 # Qwen2-VL 7B on port 8002
 ```
 
+**With Jupyter:**
+```bash
+docker compose --profile llm --profile jupyter up -d
+# LLM on port 8000
+# Jupyter Lab on port 8888
+# Or use: make jupyter
+```
+
+**With API Server:**
+```bash
+docker compose --profile llm --profile api up -d
+# LLM on port 8000
+# API on port 8080
+# Or use: make api
+```
+
+**With Red Team:**
+```bash
+docker compose --profile llm --profile redteam up -d
+# LLM on port 8000
+# Red team daemon running
+# Or use: make redteam
+```
+
 ## Configuration (.env)
 
 ```bash
@@ -225,11 +249,59 @@ llm:
     --gpu-memory-utilization 0.85
 ```
 
+## Service Integration
+
+### Jupyter Lab
+
+Start Jupyter with LLM access:
+```bash
+make jupyter
+# Access: http://localhost:8888
+# Token: mlops-dev-token
+```
+
+Use LLM in notebooks:
+```python
+from openai import OpenAI
+
+llm = OpenAI(
+    base_url="http://llm:8000/v1",  # Docker network
+    api_key="ml-workbench-key"
+)
+
+response = llm.chat.completions.create(
+    model="llm",
+    messages=[{"role": "user", "content": "Explain diffusion models"}]
+)
+print(response.choices[0].message.content)
+```
+
+### API Server
+
+Start API server with LLM backend:
+```bash
+make api
+# Access: http://localhost:8080
+```
+
+The API service has GPU access and can use LLM at `http://llm:8000/v1`.
+
+### Red Team Daemon
+
+Start red team daemon for automated adversarial testing:
+```bash
+make redteam
+# Automatically starts LLM if needed
+```
+
+The daemon connects to LLM via `OPENAI_API_BASE=http://llm:8000/v1`.
+
 ## Next Steps
 
-1. Start server: `docker compose --profile llm up -d`
-2. Test API: `curl http://localhost:8000/v1/models`
+1. Start server: `docker compose --profile llm up -d` or `make llm`
+2. Test API: `curl http://localhost:8000/v1/models` or `make test`
 3. Use in Python: See examples above
-4. Integrate with pipelines: Set `OPENAI_API_BASE=http://llm:8000/v1`
+4. Start Jupyter: `make jupyter`
+5. Start services: `make api` or `make redteam`
 
-See `llm_server/` directory for standalone deployment docs.
+For monitoring: `make gpu` or `make status`

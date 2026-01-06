@@ -15,6 +15,9 @@ help:
 	@echo "  make start-all      - Start all infrastructure (LLM + Redis + Postgres)"
 	@echo "  make start-dev      - Start development environment (+ Jupyter)"
 	@echo "  make start-full     - Start everything (multi-model + vision)"
+	@echo "  make jupyter        - Start Jupyter Lab with GPU"
+	@echo "  make api            - Start API server"
+	@echo "  make redteam        - Start red team daemon (requires LLM)"
 	@echo ""
 	@echo "$(YELLOW)Management:$(NC)"
 	@echo "  make stop           - Stop all services"
@@ -144,3 +147,28 @@ clean-all:
 llm: start
 dev: start-dev
 full: start-full
+
+jupyter:
+	@echo "$(GREEN)Starting Jupyter Lab...$(NC)"
+	docker compose --profile jupyter up -d
+	@echo "$(GREEN)✓ Jupyter Lab started$(NC)"
+	@echo "$(YELLOW)Access at: http://localhost:8888$(NC)"
+	@echo "$(YELLOW)Token: $(NC)"
+	@docker compose logs jupyter 2>/dev/null | grep "token=" | tail -1 || echo "mlops-dev-token"
+
+api:
+	@echo "$(GREEN)Starting API server...$(NC)"
+	docker compose --profile api up -d
+	@echo "$(GREEN)✓ API server started$(NC)"
+	@echo "$(YELLOW)Access at: http://localhost:8080$(NC)"
+
+redteam:
+	@echo "$(GREEN)Starting red team daemon...$(NC)"
+	@if ! docker compose ps llm | grep -q "Up"; then \
+		echo "$(YELLOW)LLM server not running, starting it first...$(NC)"; \
+		docker compose --profile llm up -d; \
+		echo "$(YELLOW)Waiting 30s for LLM to start...$(NC)"; \
+		sleep 30; \
+	fi
+	docker compose --profile redteam up -d
+	@echo "$(GREEN)✓ Red team daemon started$(NC)"
