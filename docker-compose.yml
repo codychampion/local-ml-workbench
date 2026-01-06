@@ -8,6 +8,9 @@
 #   labeling: docker compose --profile labeling up -d
 #   tracking: docker compose --profile tracking up -d
 #   registry: docker compose --profile registry up -d
+#   jupyter:  docker compose --profile jupyter up -d
+#   api:      docker compose --profile api up -d
+#   redteam:  docker compose --profile redteam up -d
 #   pipeline: docker compose --profile pipeline run --rm train <cmd>
 #   dev:      docker compose --profile dev up -d
 #   test:     docker compose --profile test run --rm test
@@ -238,6 +241,71 @@ services:
     restart: unless-stopped
     ports: ["5000:5000"]
     volumes: [registry-data:/var/lib/registry]
+    networks: [mlops-network]
+
+  # === JUPYTER PROFILE ===
+  jupyter:
+    build: {context: ., dockerfile: Dockerfile.jupyter}
+    profiles: [jupyter, dev]
+    restart: unless-stopped
+    depends_on: {minio: {condition: service_healthy}}
+    ports: ["8888:8888"]
+    volumes:
+      - .:/workspace:cached
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./outputs:/workspace/outputs
+      - huggingface-cache:/workspace/.cache/huggingface
+    environment:
+      <<: *pipeline_env
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-mlops-dev-token}
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+    networks: [mlops-network]
+
+  # === API PROFILE ===
+  api:
+    build: {context: ., dockerfile: Dockerfile.api}
+    profiles: [api]
+    restart: unless-stopped
+    depends_on: {minio: {condition: service_healthy}}
+    ports: ["8080:8080"]
+    volumes:
+      - .:/workspace:cached
+      - ./models:/workspace/models
+      - huggingface-cache:/workspace/.cache/huggingface
+    environment:
+      <<: *pipeline_env
+      API_PORT: 8080
+      API_HOST: 0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+    networks: [mlops-network]
+
+  # === REDTEAM PROFILE ===
+  redteam:
+    build: {context: ., dockerfile: Dockerfile.redteam}
+    profiles: [redteam, pipeline]
+    restart: unless-stopped
+    depends_on:
+      minio: {condition: service_healthy}
+      llm: {condition: service_healthy}
+    volumes:
+      - .:/workspace:cached
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./outputs:/workspace/outputs
+      - huggingface-cache:/workspace/.cache/huggingface
+    environment:
+      <<: *pipeline_env
+      OPENAI_API_BASE: http://llm:8000/v1
+      OPENAI_API_KEY: ${VLLM_API_KEY:-ml-workbench-key}
+      REDTEAM_REDIS_HOST: ${REDTEAM_REDIS_HOST:-redis}
     networks: [mlops-network]
 
   # === PIPELINE PROFILE ===
