@@ -110,7 +110,7 @@ def download_cuad_task(
     target_dir = output_dir / split
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process samples
+    # Process samples - CUAD-QA format groups by contract (title)
     output_file = target_dir / "cuad_contracts.jsonl"
     stats = {
         "total_samples": 0,
@@ -118,43 +118,61 @@ def download_cuad_task(
         "total_text_length": 0,
     }
 
-    print(f"\nProcessing samples...")
+    print(f"\nProcessing samples (grouping QA pairs by contract)...")
+
+    # Group QA pairs by contract title
+    contracts = {}
+    for idx, sample in enumerate(ds):
+        if limit > 0 and len(contracts) >= limit:
+            break
+
+        title = sample.get("title", f"contract_{idx}")
+        context = sample.get("context", "")
+        question = sample.get("question", "")
+        answers = sample.get("answers", {})
+
+        if title not in contracts:
+            contracts[title] = {
+                "id": len(contracts),
+                "title": title,
+                "text": context,
+                "text_length": len(context),
+                "timestamp": datetime.now().isoformat(),
+                "clauses": {}
+            }
+
+        # Extract clause category from question
+        # Questions are like "Highlight the parts (if any) of this contract related to "Anti-Assignment" that should be reviewed by a lawyer."
+        clause_category = question
+        for key, value in sample.items():
+            if key == "question":
+                clause_category = question.split('"')[1] if '"' in question else question
+                break
+
+        # Store the answers for this clause
+        answer_texts = answers.get("text", []) if isinstance(answers, dict) else []
+        has_answer = len(answer_texts) > 0 and answer_texts[0] != ""
+        contracts[title]["clauses"][clause_category] = {
+            "answers": answer_texts,
+            "has_clause": has_answer
+        }
+        stats["clause_categories"].add(clause_category)
+
+        if (idx + 1) % 1000 == 0:
+            print(f"  Processed {idx + 1} QA pairs, {len(contracts)} contracts...")
+
+    # Write contracts to file
+    print(f"\nWriting {len(contracts)} contracts...")
     try:
         with output_file.open("w", encoding="utf-8") as f:
-            for idx, sample in enumerate(ds):
-                if limit > 0 and idx >= limit:
-                    break
-
-                # Validate text column exists
-                if text_column not in sample:
-                    print(f"  Warning: Sample {idx} missing '{text_column}' column, skipping")
-                    continue
-
-                # Extract sample data
-                sample_data = {
-                    "id": idx,
-                    "text": sample.get(text_column, ""),
-                    "text_length": len(sample.get(text_column, "")),
-                    "timestamp": datetime.now().isoformat(),
-                }
-
-                # Add clause annotations
-                for key, value in sample.items():
-                    if key != text_column:
-                        sample_data[key] = value
-                        if value:  # Track present categories
-                            stats["clause_categories"].add(key)
-
-                f.write(json.dumps(sample_data, ensure_ascii=False) + "\n")
+            for title, contract in contracts.items():
+                f.write(json.dumps(contract, ensure_ascii=False) + "\n")
                 stats["total_samples"] += 1
-                stats["total_text_length"] += sample_data["text_length"]
-
-                if (idx + 1) % 100 == 0:
-                    print(f"  Processed {idx + 1} samples...")
+                stats["total_text_length"] += contract["text_length"]
 
         if stats["total_samples"] == 0:
             raise ValueError(
-                f"No samples processed. Check that '{text_column}' column exists in dataset"
+                f"No contracts processed. Check dataset format"
             )
 
     except IOError as e:
@@ -217,20 +235,22 @@ def prepare_maker_experiment_task(
     tasks = []
     with input_file.open("r", encoding="utf-8") as f:
         for line in f:
-            sample = json.loads(line)
+            contract = json.loads(line)
 
             # Create subtasks for each clause category
-            for key in sample.keys():
-                if key not in ["id", "text", "text_length", "timestamp"]:
-                    task = {
-                        "contract_id": sample["id"],
-                        "text": sample["text"],
-                        "clause_category": key,
-                        "label": sample[key],
-                        "task_type": "clause_identification",
-                        "voting_threshold": voting_threshold,
-                    }
-                    tasks.append(task)
+            clauses = contract.get("clauses", {})
+            for clause_category, clause_data in clauses.items():
+                task = {
+                    "contract_id": contract["id"],
+                    "contract_title": contract.get("title", ""),
+                    "text": contract["text"],
+                    "clause_category": clause_category,
+                    "label": clause_data.get("has_clause", False),
+                    "ground_truth_answers": clause_data.get("answers", []),
+                    "task_type": "clause_identification",
+                    "voting_threshold": voting_threshold,
+                }
+                tasks.append(task)
 
     # Save decomposed tasks
     output_file = output_dir / "maker_tasks.jsonl"
@@ -262,8 +282,8 @@ def main():
     )
     parser.add_argument(
         "--dataset",
-        default="theatticusproject/cuad",
-        help="Dataset name (default: theatticusproject/cuad)"
+        default="theatticusproject/cuad-qa",
+        help="Dataset name (default: theatticusproject/cuad-qa)"
     )
     parser.add_argument(
         "--split",

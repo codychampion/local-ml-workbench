@@ -4,9 +4,9 @@
 
 collect_cuad:
   source:
-    dataset: "theatticusproject/cuad"
+    dataset: "theatticusproject/cuad-qa"
     split: train
-    limit: 1000  # -1 for full dataset (84,325 samples)
+    limit: 10  # Number of contracts (not QA pairs)
 
   filter:
     text_column: text
