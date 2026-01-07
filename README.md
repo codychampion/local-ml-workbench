@@ -58,7 +58,7 @@ See [README_LLM.md](README_LLM.md) for detailed LLM server configuration.
 
 ```
 1. Plan          → knowledge/experiments/plans/
-2. Collect       → python -m pipelines.collect.collect_{reddit,hf,cuad}
+2. Collect       → python -m pipelines.collect.collect_{reddit,hf}
 3. Annotate      → python -m pipelines.annotate.caption
 4. Train         → python -m pipelines.train.train_lora
 5. Evaluate      → python -m pipelines.evaluate.benchmark
@@ -85,18 +85,6 @@ python -m pipelines.collect.collect_hf --dataset laion/laion400m --split train -
 
 # With Hydra config
 python -m pipelines.collect.collect_hf --hydra pipeline=collect_hf
-```
-
-### CUAD Contract Dataset
-```bash
-# Download 1000 contract samples
-python -m pipelines.collect.collect_cuad --split train --limit 1000
-
-# Full dataset (84,325 samples)
-python -m pipelines.collect.collect_cuad --split train --limit -1
-
-# With Hydra config for MAKER experiment
-python -m pipelines.collect.collect_cuad --hydra pipeline=collect_cuad
 ```
 
 ## Knowledge Vault
@@ -134,10 +122,6 @@ docker compose --profile pipeline run --rm collect \
 # Collect - HuggingFace
 docker compose --profile pipeline run --rm collect \
   python -m pipelines.collect.collect_hf --dataset laion/laion400m --limit 50
-
-# Collect - CUAD (Legal Contracts)
-docker compose --profile pipeline run --rm collect \
-  python -m pipelines.collect.collect_cuad --split train --limit 100
 
 # Annotate - Caption images
 docker compose --profile pipeline run --rm annotate \
