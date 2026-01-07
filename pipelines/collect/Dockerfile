@@ -40,11 +40,13 @@ RUN uv pip install --system --no-cache \
     "dvc[s3]>=3.0.0" \
     Pillow requests tqdm \
     python-dotenv pyyaml \
-    # For CUAD collection - need compatible pyarrow version
-    "pyarrow>=12.0.0" \
-    datasets \
     hydra-core \
     omegaconf
+
+# Install datasets with compatible pyarrow - separate step to ensure proper versions
+RUN uv pip install --system --no-cache \
+    "pyarrow>=14.0.1" \
+    "datasets>=2.18.0"
 
 RUN mkdir -p /workspace/data/{raw,collected} \
     && chown -R mlops:mlops /workspace
