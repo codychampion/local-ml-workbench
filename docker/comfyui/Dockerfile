@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -17,9 +17,9 @@ WORKDIR /app
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git . && \
     git checkout master
 
-# Install Python dependencies - use PyTorch 2.5+ with CUDA 12.4 for RTX 5090 support
-RUN pip3 install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 && \
+# Install Python dependencies - use PyTorch nightly with sm_120 support for RTX 5090
+RUN pip3 install --no-cache-dir --pre \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu126 && \
     pip3 install --no-cache-dir -r requirements.txt
 
 # Install ComfyUI-Manager for easy model downloading and custom node management
