@@ -24,11 +24,15 @@ RUN git clone --recursive --branch main https://github.com/pytorch/pytorch && \
     cd pytorch && \
     pip3 install --no-cache-dir -r requirements.txt && \
     pip3 install --no-cache-dir mkl mkl-include && \
-    # Set build flags for sm_120 support
+    # Set build flags for sm_120 support with reduced memory usage
     export USE_CUDA=1 && \
     export USE_CUDNN=1 && \
-    export TORCH_CUDA_ARCH_LIST="5.0;6.0;7.0;7.5;8.0;8.6;9.0;12.0" && \
-    export MAX_JOBS=4 && \
+    export TORCH_CUDA_ARCH_LIST="8.6;9.0;12.0" && \
+    export MAX_JOBS=1 && \
+    export BUILD_CAFFE2=0 && \
+    export USE_DISTRIBUTED=0 && \
+    export USE_NCCL=0 && \
+    export BUILD_TEST=0 && \
     # Build and install PyTorch
     python3 setup.py develop
 
