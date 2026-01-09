@@ -26,17 +26,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
     && mkdir -p /workspace && chown -R mlops:mlops /workspace
 
-# Inference dependencies
-RUN uv pip install --system --no-cache \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
+# Inference dependencies - use PyTorch nightly for RTX 5090 support
+RUN uv pip install --system --no-cache --pre \
+    --extra-index-url https://download.pytorch.org/whl/nightly/cu126 \
     torch torchvision \
     transformers>=4.36.0 \
-    diffusers \
+    diffusers>=0.30.0 \
     accelerate \
     peft>=0.7.0 \
     fiftyone \
     aim \
-    # Prefect removed from pipelines; keep others
     hydra-core>=1.3.0 \
     omegaconf>=2.3.0 \
     boto3 \
@@ -44,7 +43,10 @@ RUN uv pip install --system --no-cache \
     Pillow numpy tqdm requests \
     python-dotenv pyyaml \
     opencv-python-headless \
-    ultralytics
+    ultralytics \
+    av \
+    imageio[ffmpeg] \
+    imageio-ffmpeg
 
 # Install CLIP for adversarial pipeline
 RUN uv pip install --system --no-cache \
