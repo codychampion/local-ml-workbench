@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -26,8 +26,10 @@ RUN git clone --recursive https://github.com/bmaltais/kohya_ss.git . && \
     git submodule update --init --recursive
 
 # Install PyTorch nightly with CUDA 12.8 for RTX 5090 support
+# Use torch nightly for RTX 5090 sm_120 support, but stable torchvision to avoid version conflicts
 RUN pip3 install --no-cache-dir --pre \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+    torch --index-url https://download.pytorch.org/whl/nightly/cu128 && \
+    pip3 install --no-cache-dir torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install core Kohya_ss dependencies manually (avoid file:/// reference issue)
 RUN pip3 install --no-cache-dir \
