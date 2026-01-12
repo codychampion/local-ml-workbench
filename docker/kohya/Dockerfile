@@ -28,14 +28,30 @@ RUN git clone --recursive https://github.com/bmaltais/kohya_ss.git . && \
 RUN pip3 install --no-cache-dir --pre \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
-# Install Kohya_ss requirements (skip the local sd-scripts dependency for now)
-RUN grep -v "file:///" requirements.txt > requirements_filtered.txt && \
-    pip3 install --no-cache-dir -r requirements_filtered.txt || true
+# Install core Kohya_ss dependencies manually (avoid file:/// reference issue)
+RUN pip3 install --no-cache-dir \
+    gradio \
+    transformers \
+    diffusers \
+    accelerate \
+    datasets \
+    opencv-python \
+    einops \
+    pytorch-lightning \
+    bitsandbytes \
+    altair \
+    easygui \
+    toml \
+    voluptuous \
+    huggingface-hub \
+    safetensors \
+    tk \
+    pillow \
+    dadaptation
 
-# Install additional dependencies
+# Install additional training optimizers
 RUN pip3 install --no-cache-dir \
     xformers \
-    bitsandbytes \
     wandb \
     tensorboard \
     lycoris-lora \
