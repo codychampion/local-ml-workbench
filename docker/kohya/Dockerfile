@@ -19,23 +19,27 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Clone Kohya_ss
-RUN git clone https://github.com/bmaltais/kohya_ss.git . && \
-    git checkout master
+# Clone Kohya_ss with submodules
+RUN git clone --recursive https://github.com/bmaltais/kohya_ss.git . && \
+    git checkout master && \
+    git submodule update --init --recursive
 
 # Install PyTorch nightly with CUDA 12.8 for RTX 5090 support
 RUN pip3 install --no-cache-dir --pre \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
-# Install Kohya_ss requirements
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install Kohya_ss requirements (skip the local sd-scripts dependency for now)
+RUN grep -v "file:///" requirements.txt > requirements_filtered.txt && \
+    pip3 install --no-cache-dir -r requirements_filtered.txt || true
 
 # Install additional dependencies
 RUN pip3 install --no-cache-dir \
     xformers \
     bitsandbytes \
     wandb \
-    tensorboard
+    tensorboard \
+    lycoris-lora \
+    prodigyopt
 
 # Create directories
 RUN mkdir -p /app/datasets /app/models /app/output /app/logs
