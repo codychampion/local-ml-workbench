@@ -6,6 +6,7 @@ set -e
 SUBREDDIT="${1:-fo4}"
 CONCEPT="${2:-fallout}"
 LIMIT="${3:-100}"
+EPOCHS="${4:-5}"
 OUTPUT_DIR="./data/scraped/${CONCEPT}_$(date +%Y%m%d_%H%M%S)"
 
 echo "=========================================="
@@ -14,11 +15,12 @@ echo "=========================================="
 echo "Subreddit: r/${SUBREDDIT}"
 echo "Concept: ${CONCEPT}"
 echo "Limit: ${LIMIT} images"
+echo "Epochs: ${EPOCHS}"
 echo "=========================================="
 
 # Step 1: Scrape images from Reddit
 echo ""
-echo "[1/3] 📥 Scraping images from r/${SUBREDDIT}..."
+echo "[1/2] 📥 Scraping images from r/${SUBREDDIT}..."
 mkdir -p "${OUTPUT_DIR}"
 
 python pipelines/collect/collect_reddit.py \
@@ -36,15 +38,16 @@ if [ "${IMAGE_COUNT}" -lt 10 ]; then
     exit 1
 fi
 
-# Step 2: Organize and generate config
+# Step 2: Train LoRA using native pipeline
 echo ""
-echo "[2/3] 📁 Organizing training data..."
-python scripts/train_lora_auto.py \
-    --source "${OUTPUT_DIR}" \
+echo "[2/2] 🚀 Training LoRA..."
+python pipelines/train/train_video_lora.py \
+    --dataset "${OUTPUT_DIR}" \
     --concept "${CONCEPT}" \
-    --repeats 10 \
-    --epochs 5 \
-    --lr 1e-4
+    --epochs "${EPOCHS}" \
+    --batch-size 1 \
+    --learning-rate 1e-4 \
+    --lora-rank 8
 
 echo ""
 echo "=========================================="
