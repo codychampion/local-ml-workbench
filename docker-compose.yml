@@ -207,6 +207,27 @@ services:
           devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
     networks: [mlops-network]
 
+  # === KOHYA_SS PROFILE (LoRA Training) ===
+  kohya:
+    build: {context: ., dockerfile: docker/kohya/Dockerfile}
+    profiles: [kohya]
+    restart: unless-stopped
+    ports: ["7860:7860"]
+    volumes:
+      - ./data:/app/datasets:rw
+      - ./models:/app/models:rw
+      - ./outputs:/app/output:rw
+      - ./logs:/app/logs:rw
+      - huggingface-cache:/root/.cache/huggingface
+    environment:
+      HF_HOME: /root/.cache/huggingface
+      WANDB_API_KEY: ${WANDB_API_KEY:-}
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]
+    networks: [mlops-network]
+
   # === TRACKING PROFILE ===
   aim:
     image: aimstack/aim:3.19.3
