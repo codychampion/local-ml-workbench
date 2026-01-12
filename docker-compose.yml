@@ -209,15 +209,15 @@ services:
 
   # === KOHYA_SS PROFILE (LoRA Training) ===
   kohya:
-    build: {context: ., dockerfile: docker/kohya/Dockerfile}
+    image: ghcr.io/bmaltais/kohya-ss-gui:latest
     profiles: [kohya]
     restart: unless-stopped
     ports: ["7860:7860"]
     volumes:
-      - ./data:/app/datasets:rw
-      - ./models:/app/models:rw
-      - ./outputs:/app/output:rw
-      - ./logs:/app/logs:rw
+      - ./data:/workspace/dataset:rw
+      - ./models:/workspace/models:rw
+      - ./outputs:/workspace/output:rw
+      - ./logs:/workspace/logs:rw
       - huggingface-cache:/root/.cache/huggingface
     environment:
       HF_HOME: /root/.cache/huggingface
