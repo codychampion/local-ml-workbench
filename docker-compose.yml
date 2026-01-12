@@ -218,7 +218,9 @@ services:
       - ./models:/app/models:rw
       - ./outputs:/app/outputs:rw
       - ./logs:/app/logs:rw
+      - ./config:/app/config:rw
       - huggingface-cache:/root/.cache/huggingface
+    working_dir: /app
     environment:
       HF_HOME: /root/.cache/huggingface
       WANDB_API_KEY: ${WANDB_API_KEY:-}
