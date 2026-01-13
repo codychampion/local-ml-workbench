@@ -312,9 +312,17 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.dataset.exists():
-        print(f"Error: Dataset directory does not exist: {args.dataset}")
+    # Convert to absolute path and check existence
+    dataset_path = args.dataset.resolve() if args.dataset.is_absolute() else (Path.cwd() / args.dataset).resolve()
+
+    if not dataset_path.exists():
+        print(f"Error: Dataset directory does not exist: {dataset_path}")
+        print(f"  Working directory: {Path.cwd()}")
+        print(f"  Provided path: {args.dataset}")
         sys.exit(1)
+
+    # Use resolved path
+    args.dataset = dataset_path
 
     # Set output directory
     if args.output is None:

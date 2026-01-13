@@ -22,28 +22,40 @@ echo "=========================================="
 # Step 1: Scrape images from Reddit (in Docker)
 echo ""
 echo "[1/2] 📥 Scraping images from r/${SUBREDDIT}..."
-docker compose --profile pipeline run --rm collect \
+# Use relative path - Docker mounts . to /workspace
+docker compose --profile pipeline run --rm -e MSYS_NO_PATHCONV=1 collect \
     python pipelines/collect/collect_reddit.py \
     --subreddit "${SUBREDDIT}" \
     --limit "${LIMIT}" \
-    --output "/workspace/${OUTPUT_DIR}"
+    --output "${OUTPUT_DIR}"
 
-# Count images
-IMAGE_COUNT=$(find "${OUTPUT_DIR}" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" \) 2>/dev/null | wc -l)
-echo "✓ Collected ${IMAGE_COUNT} images"
+# Wait for filesystem sync
+sleep 2
+
+# Count images (on host)
+if [ -d "${OUTPUT_DIR}" ]; then
+    IMAGE_COUNT=$(find "${OUTPUT_DIR}" -type f \( -name "*.jpg" -o -name "*.png" -o -name "*.jpeg" -o -name "*.webp" \) 2>/dev/null | wc -l || echo "0")
+else
+    IMAGE_COUNT=0
+fi
+
+echo "✓ Collected ${IMAGE_COUNT} images in ${OUTPUT_DIR}"
 
 if [ "${IMAGE_COUNT}" -lt 10 ]; then
     echo "❌ Error: Need at least 10 images for training"
-    echo "   Images saved to: ${OUTPUT_DIR}"
+    echo "   Attempted to scrape from: r/${SUBREDDIT}"
+    echo "   Output directory: ${OUTPUT_DIR}"
+    ls -la "${OUTPUT_DIR}" 2>/dev/null || echo "   Directory doesn't exist yet"
     exit 1
 fi
 
 # Step 2: Train LoRA (in Docker)
 echo ""
 echo "[2/2] 🚀 Training LoRA..."
-docker compose --profile pipeline run --rm train \
+# Use relative path - Docker mounts . to /workspace
+docker compose --profile pipeline run --rm -e MSYS_NO_PATHCONV=1 train \
     python pipelines/train/train_video_lora.py \
-    --dataset "/workspace/${OUTPUT_DIR}" \
+    --dataset "${OUTPUT_DIR}" \
     --concept "${CONCEPT}" \
     --epochs "${EPOCHS}" \
     --batch-size 1 \
