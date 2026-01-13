@@ -34,6 +34,8 @@ RUN uv pip install --system --no-cache \
     transformers>=4.36.0 \
     accelerate \
     peft>=0.7.0 \
+    diffusers>=0.25.0 \
+    safetensors>=0.4.0 \
     datasets>=2.16.0 \
     aim \
     # Prefect removed from pipelines; keep others

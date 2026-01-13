@@ -49,18 +49,19 @@ if [ "${IMAGE_COUNT}" -lt 10 ]; then
     exit 1
 fi
 
-# Step 2: Train LoRA (in Docker)
+# Step 2: Train LoRA (in Docker) - REAL TRAINING
 echo ""
-echo "[2/2] 🚀 Training LoRA..."
+echo "[2/2] 🚀 Training LoRA (REAL diffusion training)..."
 # Use relative path - Docker mounts . to /workspace
 docker compose --profile pipeline run --rm -e MSYS_NO_PATHCONV=1 train \
-    python pipelines/train/train_video_lora.py \
+    python pipelines/train/train_video_lora_real.py \
     --dataset "${OUTPUT_DIR}" \
     --concept "${CONCEPT}" \
     --epochs "${EPOCHS}" \
     --batch-size 1 \
     --learning-rate 1e-4 \
-    --lora-rank 8
+    --lora-rank 8 \
+    --lora-alpha 16
 
 echo ""
 echo "=========================================="
