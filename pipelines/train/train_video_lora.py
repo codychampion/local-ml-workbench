@@ -252,8 +252,14 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="/app/models/unet/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
-        help="Base model path"
+        default="./models/unet/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+        help="Base model path (use high_noise or low_noise from ComfyUI)"
+    )
+    parser.add_argument(
+        "--target-model",
+        choices=["high_noise", "low_noise", "both"],
+        default="high_noise",
+        help="Which ComfyUI model to train for"
     )
     parser.add_argument(
         "--output", "-o",
