@@ -1,0 +1,243 @@
+{
+  "id": "custom-lora-test",
+  "last_node_id": 20,
+  "last_link_id": 30,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [50, 50],
+      "size": [350, 82],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1]}],
+      "properties": {"Node name for S&R": "UNETLoader"},
+      "widgets_values": [
+        "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+        "default"
+      ],
+      "title": "Base Model (High Noise)"
+    },
+    {
+      "id": 2,
+      "type": "LoraLoaderModelOnly",
+      "pos": [450, 50],
+      "size": [350, 82],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [{"name": "model", "type": "MODEL", "link": 1}],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [2]}],
+      "properties": {"Node name for S&R": "LoraLoaderModelOnly"},
+      "widgets_values": [
+        "newvegas_epoch5.safetensors",
+        0.8
+      ],
+      "title": "YOUR CUSTOM LORA - Adjust strength here"
+    },
+    {
+      "id": 3,
+      "type": "ModelSamplingSD3",
+      "pos": [850, 50],
+      "size": [210, 58],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{"name": "model", "type": "MODEL", "link": 2}],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [3]}],
+      "properties": {"Node name for S&R": "ModelSamplingSD3"},
+      "widgets_values": [5.0]
+    },
+    {
+      "id": 4,
+      "type": "CLIPLoader",
+      "pos": [50, 200],
+      "size": [350, 106],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [4, 5]}],
+      "properties": {"Node name for S&R": "CLIPLoader"},
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "default"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [450, 200],
+      "size": [500, 180],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6]}],
+      "properties": {"Node name for S&R": "CLIPTextEncode"},
+      "widgets_values": [
+        "NCR ranger standing at Hoover Dam overlooking the Colorado River, golden hour sunset lighting, cinematic wide shot, detailed power armor"
+      ],
+      "title": "Positive Prompt - Test your concept here",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [450, 420],
+      "size": [500, 180],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 5}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [7]}],
+      "properties": {"Node name for S&R": "CLIPTextEncode"},
+      "widgets_values": [
+        "blurry, low quality, static, oversaturated, nsfw"
+      ],
+      "title": "Negative Prompt",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 7,
+      "type": "EmptyHunyuanLatentVideo",
+      "pos": [50, 360],
+      "size": [315, 130],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8]}],
+      "properties": {"Node name for S&R": "EmptyHunyuanLatentVideo"},
+      "widgets_values": [640, 640, 81, 1],
+      "title": "Video Size (640x640, 81 frames)"
+    },
+    {
+      "id": 8,
+      "type": "KSamplerAdvanced",
+      "pos": [1000, 200],
+      "size": [315, 546],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 3},
+        {"name": "positive", "type": "CONDITIONING", "link": 6},
+        {"name": "negative", "type": "CONDITIONING", "link": 7},
+        {"name": "latent_image", "type": "LATENT", "link": 8}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9]}],
+      "properties": {"Node name for S&R": "KSamplerAdvanced"},
+      "widgets_values": [
+        "enable",
+        123456,
+        "randomize",
+        4,
+        1.0,
+        "euler",
+        "simple",
+        0,
+        4,
+        "enable"
+      ],
+      "title": "Sampler (4 steps for speed)"
+    },
+    {
+      "id": 9,
+      "type": "VAELoader",
+      "pos": [50, 540],
+      "size": [350, 60],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [10]}],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["wan_2.1_vae.safetensors"]
+    },
+    {
+      "id": 10,
+      "type": "VAEDecode",
+      "pos": [1350, 200],
+      "size": [210, 46],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 9},
+        {"name": "vae", "type": "VAE", "link": 10}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [11]}],
+      "properties": {"Node name for S&R": "VAEDecode"}
+    },
+    {
+      "id": 11,
+      "type": "CreateVideo",
+      "pos": [1600, 200],
+      "size": [270, 78],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 11}],
+      "outputs": [{"name": "VIDEO", "type": "VIDEO", "links": [12]}],
+      "properties": {"Node name for S&R": "CreateVideo"},
+      "widgets_values": [16]
+    },
+    {
+      "id": 12,
+      "type": "SaveVideo",
+      "pos": [1900, 100],
+      "size": [700, 800],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [{"name": "video", "type": "VIDEO", "link": 12}],
+      "properties": {"Node name for S&R": "SaveVideo"},
+      "widgets_values": [
+        "video/ComfyUI",
+        "lora_test_%date%",
+        "auto"
+      ],
+      "title": "Save Video - Check output folder"
+    },
+    {
+      "id": 13,
+      "type": "Note",
+      "pos": [50, -150],
+      "size": [600, 170],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "properties": {},
+      "widgets_values": [
+        "CUSTOM LORA TEST WORKFLOW\n\n1. Node #2: Change LoRA filename to your trained model\n2. Node #2: Adjust strength (0.5 = subtle, 0.8 = balanced, 1.0 = strong)\n3. Node #5: Edit prompt to test your concept\n4. Queue Prompt and wait\n5. Compare with baseline (disable node #2 to test without LoRA)\n\nYour trained LoRAs: outputs/lora/{concept}/\nOr copy to: models/loras/"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "MODEL"],
+    [2, 2, 0, 3, 0, "MODEL"],
+    [3, 3, 0, 8, 0, "MODEL"],
+    [4, 4, 0, 5, 0, "CLIP"],
+    [5, 4, 0, 6, 0, "CLIP"],
+    [6, 5, 0, 8, 1, "CONDITIONING"],
+    [7, 6, 0, 8, 2, "CONDITIONING"],
+    [8, 7, 0, 8, 3, "LATENT"],
+    [9, 8, 0, 10, 0, "LATENT"],
+    [10, 9, 0, 10, 1, "VAE"],
+    [11, 10, 0, 11, 0, "IMAGE"],
+    [12, 11, 0, 12, 0, "VIDEO"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}
