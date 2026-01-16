@@ -29,6 +29,8 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
 
 # Full ML stack for training
 # Install PyTorch with CUDA 12.8 support for RTX 5090 (sm_120)
+# Increase timeout for large CUDA dependencies
+ENV UV_HTTP_TIMEOUT=300
 RUN uv pip install --system --no-cache \
     torch torchvision --index-url https://download.pytorch.org/whl/cu128 && \
     uv pip install --system --no-cache \
