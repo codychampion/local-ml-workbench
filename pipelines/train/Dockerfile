@@ -28,8 +28,9 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
     && mkdir -p /workspace && chown -R mlops:mlops /workspace
 
 # Full ML stack for training
+# Install PyTorch with CUDA 12.1 support for GPU training
 RUN uv pip install --system --no-cache \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://download.pytorch.org/whl/cu121 \
     torch torchvision \
     transformers>=4.36.0 \
     accelerate \
