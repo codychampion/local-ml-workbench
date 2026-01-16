@@ -79,8 +79,8 @@ def main():
     print(f"LoRA rank: {args.lora_rank}")
     print(f"{'='*60}\n")
 
-    # Check if official repo exists
-    official_repo = Path("/workspace/HunyuanVideo-1.5")
+    # Check if official repo exists (cloned to /opt to avoid volume mount override)
+    official_repo = Path("/opt/HunyuanVideo-1.5")
     if not official_repo.exists():
         print(f"[ERROR] Official HunyuanVideo-1.5 repo not found at {official_repo}")
         print(f"[ERROR] Please rebuild Docker image: docker compose build train")
@@ -134,7 +134,7 @@ def main():
             print(f"[Info] Check {official_repo}/README.md for correct usage.")
             print(f"\n[Info] You can also run training manually:")
             print(f"  docker compose --profile pipeline run --rm train bash")
-            print(f"  cd /workspace/HunyuanVideo-1.5")
+            print(f"  cd /opt/HunyuanVideo-1.5")
             print(f"  python train_lora.py --help")
             sys.exit(1)
     except Exception as e:
