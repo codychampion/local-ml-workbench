@@ -28,10 +28,10 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 mlops \
     && mkdir -p /workspace && chown -R mlops:mlops /workspace
 
 # Full ML stack for training
-# Install PyTorch with CUDA 12.1 support for GPU training
+# Install PyTorch with CUDA 12.8 support for RTX 5090 (sm_120)
 RUN uv pip install --system --no-cache \
-    --extra-index-url https://download.pytorch.org/whl/cu121 \
-    torch torchvision \
+    torch torchvision --index-url https://download.pytorch.org/whl/cu128 && \
+    uv pip install --system --no-cache \
     transformers>=4.36.0 \
     accelerate \
     peft>=0.7.0 \
