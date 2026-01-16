@@ -108,19 +108,28 @@ def main():
     prepare_dataset_for_official_training(args.dataset, prepared_dataset)
 
     # Build command for official training script
-    # Note: This is a template - actual command depends on their script's arguments
+    # Map our arguments to HunyuanVideo-1.5's expected format
+    # Calculate max_steps from epochs and dataset size
+    steps_per_epoch = len(list(prepared_dataset.glob("images/*"))) // args.batch_size
+    max_steps = steps_per_epoch * args.epochs
+
     cmd = [
         "python", str(train_script),
-        "--data_root", str(prepared_dataset),
+        "--pretrained_model_root", args.model,
+        "--pretrained_transformer_version", "720p_t2v",
         "--output_dir", str(args.output),
-        "--model_path", args.model,
-        "--lora_rank", str(args.lora_rank),
+        "--use_lora",
+        "--lora_r", str(args.lora_rank),
         "--lora_alpha", str(args.lora_alpha),
         "--learning_rate", str(args.learning_rate),
-        "--num_train_epochs", str(args.epochs),
-        "--train_batch_size", str(args.batch_size),
-        "--resolution", str(args.resolution),
+        "--max_steps", str(max_steps),
+        "--batch_size", str(args.batch_size),
+        "--dtype", "bf16",
+        "--save_interval", "500",
+        "--log_interval", "10",
     ]
+
+    print(f"[Training] Estimated steps: {max_steps} ({steps_per_epoch} steps/epoch × {args.epochs} epochs)")
 
     print(f"\n[Training] Running official training script...")
     print(f"[Training] Command: {' '.join(cmd)}\n")
