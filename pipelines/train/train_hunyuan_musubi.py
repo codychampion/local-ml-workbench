@@ -101,16 +101,26 @@ def run_latent_caching(musubi_dir: Path, config_file: Path, model_dir: Path):
     """Cache latents using HunyuanVideo 1.5 VAE."""
     print("\n[Musubi] Step 1/3: Caching latents (VAE encoding)...")
 
-    vae_path = model_dir / "vae" / "diffusion_pytorch_model.safetensors"
-    if not vae_path.exists():
-        vae_path = model_dir / "vae"  # Try directory path
+    # Check for VAE file
+    vae_file = model_dir / "vae" / "diffusion_pytorch_model.safetensors"
+    if not vae_file.exists():
+        print(f"[ERROR] VAE file not found: {vae_file}")
+        print(f"[ERROR] Model directory contents:")
+        if model_dir.exists():
+            for item in model_dir.rglob("*"):
+                if item.is_file():
+                    print(f"  {item.relative_to(model_dir)}")
+        else:
+            print(f"  Model directory doesn't exist: {model_dir}")
+        print(f"\n[ERROR] Please run without --skip-download to download models")
+        return False
 
     script = musubi_dir / "src" / "musubi_tuner" / "hv_1_5_cache_latents.py"
 
     cmd = [
         "python", str(script),
         "--dataset_config", str(config_file.absolute()),
-        "--vae", str(vae_path.absolute()),
+        "--vae", str(vae_file.absolute()),
         "--vae_sample_size", "128"
     ]
 
@@ -128,6 +138,17 @@ def run_text_encoder_caching(musubi_dir: Path, config_file: Path, model_dir: Pat
 
     text_encoder_path = model_dir / "split_files" / "text_encoders" / "qwen_2.5_vl_7b.safetensors"
     byt5_path = model_dir / "split_files" / "text_encoders" / "byt5_small_glyphxl_fp16.safetensors"
+
+    # Check for required files
+    if not text_encoder_path.exists():
+        print(f"[ERROR] Text encoder not found: {text_encoder_path}")
+        print(f"[ERROR] Please run without --skip-download to download models")
+        return False
+
+    if not byt5_path.exists():
+        print(f"[ERROR] BYT5 encoder not found: {byt5_path}")
+        print(f"[ERROR] Please run without --skip-download to download models")
+        return False
 
     script = musubi_dir / "src" / "musubi_tuner" / "hv_1_5_cache_text_encoder_outputs.py"
 
@@ -167,6 +188,24 @@ def run_lora_training(
     vae_path = model_dir / "vae" / "diffusion_pytorch_model.safetensors"
     text_encoder_path = model_dir / "split_files" / "text_encoders" / "qwen_2.5_vl_7b.safetensors"
     byt5_path = model_dir / "split_files" / "text_encoders" / "byt5_small_glyphxl_fp16.safetensors"
+
+    # Check all required files
+    missing_files = []
+    if not dit_path.exists():
+        missing_files.append(f"DiT: {dit_path}")
+    if not vae_path.exists():
+        missing_files.append(f"VAE: {vae_path}")
+    if not text_encoder_path.exists():
+        missing_files.append(f"Text Encoder: {text_encoder_path}")
+    if not byt5_path.exists():
+        missing_files.append(f"BYT5: {byt5_path}")
+
+    if missing_files:
+        print(f"[ERROR] Missing required model files:")
+        for missing in missing_files:
+            print(f"  - {missing}")
+        print(f"\n[ERROR] Please run without --skip-download to download models")
+        return False
 
     script = musubi_dir / "src" / "musubi_tuner" / "hv_1_5_train_network.py"
 
