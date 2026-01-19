@@ -111,8 +111,7 @@ def run_latent_caching(musubi_dir: Path, config_file: Path, model_dir: Path):
         "python", str(script),
         "--dataset_config", str(config_file),
         "--vae", str(vae_path),
-        "--vae_sample_size", "128",
-        "--vae_tiling"
+        "--vae_sample_size", "128"
     ]
 
     try:
