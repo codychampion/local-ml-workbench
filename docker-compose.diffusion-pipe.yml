@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Diffusion-Pipe LoRA Trainer with Gradio UI
+  diffusion-pipe:
+    image: alissonpereiraanjos/diffusion-pipe-interface:latest
+    container_name: hunyuan-lora-trainer
+    profiles: [training]
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    volumes:
+      # Your dataset
+      - ./data:/workspace/datasets:cached
+      # Model files (will be downloaded on first run)
+      - ./models:/workspace/models:cached
+      # Training outputs (LoRA files)
+      - ./outputs:/workspace/outputs:cached
+      # Training configs
+      - ./configs:/workspace/configs:cached
+      # Cache for faster subsequent runs
+      - diffusion-pipe-cache:/workspace/.cache
+
+    ports:
+      - "7860:7860"  # Gradio UI
+      - "8888:8888"  # Jupyter Lab
+      - "6006:6006"  # TensorBoard
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NCCL_P2P_DISABLE=1
+      - NCCL_IB_DISABLE=1
+
+    stdin_open: true
+    tty: true
+
+    restart: unless-stopped
+
+volumes:
+  diffusion-pipe-cache:
+    driver: local

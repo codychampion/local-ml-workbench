@@ -1,12 +1,35 @@
 # LoRA Training Status
 
-## ✅ READY TO TRAIN - Using Musubi Tuner
+## ✅ READY TO TRAIN - Using Diffusion-Pipe (Recommended)
 
-We've integrated **Musubi Tuner** (Kohya-ss) for reliable, ComfyUI-compatible LoRA training!
+**The simplest solution**: Pre-built Docker container with Gradio web UI!
 
-**Official HunyuanVideo-1.5 script has compatibility issues - see `HUNYUANVIDEO_TRAINING_ISSUES.md` for details.**
+**No Python scripts, no debugging, just a working interface.**
 
-**Quick Start**: See `pipelines/train/MUSUBI_QUICKSTART.md` for step-by-step guide.
+### Quick Start
+
+```bash
+# 1. Start the container
+docker compose -f docker-compose.diffusion-pipe.yml up -d
+
+# 2. Open web browser
+# Go to: http://localhost:7860
+
+# 3. Configure training in the UI
+# - Select HunyuanVideo model
+# - Point to your Fallout NV dataset
+# - Set LoRA rank: 32, alpha: 32
+# - Click "Start Training"
+
+# 4. Monitor progress
+# TensorBoard: http://localhost:6006
+```
+
+**Full Guide**: See `DIFFUSION_PIPE_GUIDE.md`
+
+---
+
+## Alternative: Musubi Tuner (Command Line)
 
 ### Musubi Tuner Implementation ✅
 - ✅ Docker setup with CUDA 12.8 for RTX 5090
