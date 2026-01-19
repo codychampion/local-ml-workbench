@@ -109,13 +109,13 @@ def run_latent_caching(musubi_dir: Path, config_file: Path, model_dir: Path):
 
     cmd = [
         "python", str(script),
-        "--dataset_config", str(config_file),
-        "--vae", str(vae_path),
+        "--dataset_config", str(config_file.absolute()),
+        "--vae", str(vae_path.absolute()),
         "--vae_sample_size", "128"
     ]
 
     try:
-        subprocess.run(cmd, check=True, cwd=str(musubi_dir))
+        subprocess.run(cmd, check=True)
         print("[Musubi] ✅ Latent caching complete")
         return True
     except subprocess.CalledProcessError as e:
@@ -133,15 +133,15 @@ def run_text_encoder_caching(musubi_dir: Path, config_file: Path, model_dir: Pat
 
     cmd = [
         "python", str(script),
-        "--dataset_config", str(config_file),
-        "--text_encoder", str(text_encoder_path),
-        "--byt5", str(byt5_path),
+        "--dataset_config", str(config_file.absolute()),
+        "--text_encoder", str(text_encoder_path.absolute()),
+        "--byt5", str(byt5_path.absolute()),
         "--batch_size", "16",
         "--fp8_vl"
     ]
 
     try:
-        subprocess.run(cmd, check=True, cwd=str(musubi_dir))
+        subprocess.run(cmd, check=True)
         print("[Musubi] ✅ Text encoder caching complete")
         return True
     except subprocess.CalledProcessError as e:
@@ -178,11 +178,11 @@ def run_lora_training(
         "--num_cpu_threads_per_process", "1",
         "--mixed_precision", "bf16",
         str(script),
-        "--dit", str(dit_path),
-        "--vae", str(vae_path),
-        "--text_encoder", str(text_encoder_path),
-        "--byt5", str(byt5_path),
-        "--dataset_config", str(config_file),
+        "--dit", str(dit_path.absolute()),
+        "--vae", str(vae_path.absolute()),
+        "--text_encoder", str(text_encoder_path.absolute()),
+        "--byt5", str(byt5_path.absolute()),
+        "--dataset_config", str(config_file.absolute()),
         "--task", "t2v",
         "--sdpa",
         "--mixed_precision", "bf16",
@@ -197,12 +197,12 @@ def run_lora_training(
         f"--network_alpha={lora_alpha}",
         f"--max_train_epochs={epochs}",
         f"--save_every_n_epochs={save_every_n_epochs}",
-        "--output_dir", str(output_dir),
+        "--output_dir", str(output_dir.absolute()),
         "--output_name", "lora"
     ]
 
     try:
-        subprocess.run(cmd, check=True, cwd=str(musubi_dir))
+        subprocess.run(cmd, check=True)
         print(f"[Musubi] ✅ LoRA training complete!")
         return True
     except subprocess.CalledProcessError as e:
@@ -217,12 +217,12 @@ def convert_to_comfyui(musubi_dir: Path, lora_path: Path, output_path: Path):
 
     cmd = [
         "python", str(convert_script),
-        str(lora_path),
-        str(output_path)
+        str(lora_path.absolute()),
+        str(output_path.absolute())
     ]
 
     try:
-        subprocess.run(cmd, check=True, cwd=str(musubi_dir))
+        subprocess.run(cmd, check=True)
         print(f"[Converting] ✅ ComfyUI LoRA saved to {output_path}")
         return True
     except subprocess.CalledProcessError as e:
