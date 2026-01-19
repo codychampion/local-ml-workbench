@@ -1,31 +1,40 @@
 # LoRA Training Status
 
-## ✅ READY TO TRAIN - Using Diffusion-Pipe (Recommended)
+## ✅ READY TO TRAIN - Simplified One-Command Training (Recommended)
 
-**The simplest solution**: Pre-built Docker container with Gradio web UI!
+**The working solution**: One command handles everything automatically!
 
-**No Python scripts, no debugging, just a working interface.**
+**Automatic model download, caching, and training - just works.**
 
 ### Quick Start
 
 ```bash
-# 1. Start the container
-docker compose -f docker-compose.diffusion-pipe.yml up -d
+# Rebuild Docker image (one-time)
+docker compose build train
 
-# 2. Open web browser
-# Go to: http://localhost:7860
-
-# 3. Configure training in the UI
-# - Select HunyuanVideo model
-# - Point to your Fallout NV dataset
-# - Set LoRA rank: 32, alpha: 32
-# - Click "Start Training"
-
-# 4. Monitor progress
-# TensorBoard: http://localhost:6006
+# Start training (one command!)
+docker compose --profile pipeline run --rm train \
+    python pipelines/train/train_lora_simple.py \
+    --dataset data/scraped/fallout_nv_20260116_113625
 ```
 
-**Full Guide**: See `DIFFUSION_PIPE_GUIDE.md`
+**First run**: Downloads models (~30 min) + trains (6-8 hours)
+**Subsequent runs**: Starts training immediately (models cached)
+
+**Full Guide**: See `QUICKSTART_TRAINING.md`
+
+---
+
+## What About Diffusion-Pipe? ❌
+
+Attempted to use pre-built Docker container (`alissonpereiraanjos/diffusion-pipe-interface`) with Gradio UI, but encountered networking issues in Windows/WSL2 environment:
+- DNS resolution failures (conda.anaconda.org, github.com, pypi.org)
+- Could not install required packages (deepspeed, gradio, tensorboard)
+- Container failed to start Gradio interface
+
+**Status**: Abandoned due to environment-specific networking issues.
+
+**See**: `docker-compose.diffusion-pipe.yml` and `DIFFUSION_PIPE_GUIDE.md` (for reference)
 
 ---
 
