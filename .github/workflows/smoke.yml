@@ -1,0 +1,20 @@
+name: smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  python-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python files
+        run: python -m compileall scripts
+      - name: Validate model image registration CLI help
+        run: python scripts/register_model_image.py --help
