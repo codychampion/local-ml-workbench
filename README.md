@@ -1,5 +1,11 @@
 # MLOps Workbench
 
+![Status](https://img.shields.io/badge/status-active-16a34a)
+![Docker](https://img.shields.io/badge/Docker-compose-2496ed)
+![Python](https://img.shields.io/badge/Python-ML%20pipelines-3776ab)
+![Local LLM](https://img.shields.io/badge/local%20LLM-vLLM-7c3aed)
+![MLOps](https://img.shields.io/badge/MLOps-local--first-111827)
+
 A self-hosted machine-learning workbench for running local AI experiments end to end: data collection, annotation, training, evaluation, inference, model tracking, local LLM serving, and research notes in one Dockerized environment.
 
 This repo is designed for the messy middle between notebooks and production: the place where experiments need repeatable infrastructure, useful observability, durable artifacts, and enough structure that future-you can understand what happened.
