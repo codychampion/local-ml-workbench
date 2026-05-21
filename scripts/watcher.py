@@ -195,6 +195,8 @@ def create_dataset_card(manifest_path: Path, output_dir: Path) -> Path:
     except Exception:
         pass
 
+    stats_table = fmt_table(stats) if stats else "| Stat | Value |\n|------|-------|\n| Samples | |\n| Classes | |"
+
     content = f'''---
 type: dataset
 dataset_id: "{name}"
@@ -213,7 +215,7 @@ tags: []
 - **Manifest:** datasets/manifests/{manifest_path.name}
 
 ## Statistics
-{fmt_table(stats) if stats else "| Stat | Value |\n|------|-------|\n| Samples | |\n| Classes | |"}
+{stats_table}
 
 ## Splits
 | Split | Samples | Notes |
