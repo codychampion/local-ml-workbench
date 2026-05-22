@@ -10,6 +10,8 @@ A self-hosted machine-learning workbench for running local AI experiments end to
 
 This repo is designed for the messy middle between notebooks and production: the place where experiments need repeatable infrastructure, useful observability, durable artifacts, and enough structure that future-you can understand what happened.
 
+![Local ML Workbench overview](docs/images/local-ml-workbench-overview.png)
+
 ## What this gives you
 
 | Capability | Services / tools |
